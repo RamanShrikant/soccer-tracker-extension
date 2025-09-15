@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Soccer Tracker",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "frontend/build/index.html",
+    "default_title": "Soccer Tracker"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://*/*", "http://*/*"]
+}
