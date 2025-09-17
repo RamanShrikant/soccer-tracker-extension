@@ -23,7 +23,7 @@ function App() {
   }, []);
 
   return (
-    <div className="p-4">
+    <div className="p-4 w-[460px] h-[640px] overflow-y-auto">
       <h1 className="text-lg font-bold mb-2">Today’s Matches</h1>
       <button
         onClick={fetchScores}
@@ -34,7 +34,7 @@ function App() {
 
       {loading && <p>Loading…</p>}
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-4">
         {matches.map(m => (
           <ScoreCard key={m.fixtureId} match={m} />
         ))}
