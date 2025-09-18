@@ -1,22 +1,25 @@
-# Use an official JDK image
+# Use an official OpenJDK runtime as a parent image
 FROM eclipse-temurin:21-jdk
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
-# Copy Maven wrapper & pom.xml first (for caching dependencies)
+# Copy Maven wrapper and pom.xml
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
 
-# Download dependencies
-RUN ./mvnw dependency:go-offline
+# Make Maven wrapper executable
+RUN chmod +x mvnw
+
+# Download dependencies (cached separately from source)
+RUN ./mvnw dependency:go-offline -B
 
 # Copy the rest of the source code
 COPY src src
 
-# Build the JAR (skip tests to save time)
-RUN ./mvnw clean package -DskipTests
+# Build the Spring Boot application
+RUN ./mvnw package -DskipTests
 
-# Run the JAR
+# Run the application
 CMD ["java", "-jar", "target/soccer-backend-0.0.1-SNAPSHOT.jar"]
