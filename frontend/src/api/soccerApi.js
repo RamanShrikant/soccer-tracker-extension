@@ -31,7 +31,7 @@ export async function getTodayFixtures(force = false) {
   const hit = fixturesCache.get(date);
   if (!force && hit && Date.now() - hit.ts < FIXTURE_TTL_MS) return hit.data;
 
-  const json = await fetchJson(url);
+  const json = await fetchJson(url);  
   const data = normalizeFixtures(json);
   fixturesCache.set(date, { data, ts: Date.now() });
   return data;

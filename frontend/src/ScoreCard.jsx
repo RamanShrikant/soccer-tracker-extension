@@ -1,6 +1,6 @@
 // frontend/src/ScoreCard.jsx
 import React from "react";
-import { getMatchEvents } from "./api/soccerApi"; // returns { timeline } (cached 2 min)
+import { getMatchEvents } from "./api/soccerApi"; // returns { timeline }
 
 const BADGE_SIZE = "h-16 w-16";
 const CARD_PAD = "p-5";
@@ -44,18 +44,21 @@ const fmtLocalTime = (iso) =>
 
 const onlyGoals = (tl = []) => tl.filter((ev) => /GOAL|PEN|OWN/i.test(ev.type || ""));
 
-function ScorersLine({ goals }) {
-  if (!goals?.length) return null;
-  const txt = goals
-    .map(
-      (g) =>
-        `${g.player || "Unknown"} ${g.minute ?? 0}${
-          g.extra ? `+${g.extra}` : ""
-        }′`
-    )
-    .join(", ");
+function TeamScorers({ goals, teamName }) {
+  const teamGoals = goals.filter((g) => g.team === teamName);
+  if (!teamGoals.length) return null;
+
   return (
-    <div className="text-sm text-gray-700 text-center leading-tight">{txt}</div>
+    <div className="text-xs text-gray-600 text-center leading-tight mt-1">
+      {teamGoals
+        .map(
+          (g) =>
+            `${g.player || "Unknown"} ${g.minute ?? 0}${
+              g.extra ? `+${g.extra}` : ""
+            }′`
+        )
+        .join(", ")}
+    </div>
   );
 }
 
@@ -65,9 +68,8 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
 
   const [timeline, setTimeline] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
-  const [open, setOpen] = React.useState(false); // show/hide details line
+  const [open, setOpen] = React.useState(false);
 
-  // Center-top text: elapsed, HT, or kickoff time
   const phase = (status.phase || "NS").toUpperCase();
   const centerTop =
     phase === "IN_PLAY"
@@ -81,11 +83,11 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   async function loadDetails() {
     if (timeline) {
       setOpen((v) => !v);
-      return; // already fetched; just toggle
+      return;
     }
     try {
       setLoading(true);
-      const { timeline: tl } = await getMatchEvents(id); // 1 call; cached in api
+      const { timeline: tl } = await getMatchEvents(id);
       setTimeline(tl || []);
       setOpen(true);
     } finally {
@@ -112,7 +114,8 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
       </div>
 
       {/* 3-column layout */}
-      <div className="grid grid-cols-3 items-center">
+      <div className="grid grid-cols-3 items-start">
+        {/* Home side */}
         <div className="flex flex-col items-center gap-2">
           <Crest
             name={home.name || "Home"}
@@ -122,15 +125,16 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {home.name || "Home"}
           </div>
+          {open && <TeamScorers goals={goals} teamName={home.name} />}
         </div>
 
+        {/* Center */}
         <div className="flex flex-col items-center gap-1">
           <div className="text-lg font-medium text-gray-900">{centerTop}</div>
           <div className="text-2xl font-normal tabular-nums">
             {home.score ?? 0}–{away.score ?? 0}
           </div>
 
-          {/* Details button / scorers */}
           {!open ? (
             <button
               onClick={loadDetails}
@@ -140,11 +144,10 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
             >
               {loading ? "Loading…" : "Details"}
             </button>
-          ) : (
-            <ScorersLine goals={goals} />
-          )}
+          ) : null}
         </div>
 
+        {/* Away side */}
         <div className="flex flex-col items-center gap-2">
           <Crest
             name={away.name || "Away"}
@@ -154,6 +157,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {away.name || "Away"}
           </div>
+          {open && <TeamScorers goals={goals} teamName={away.name} />}
         </div>
       </div>
     </div>

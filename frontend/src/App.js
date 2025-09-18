@@ -1,3 +1,4 @@
+// App.js
 import React, { useEffect, useState } from "react";
 import ScoreCard from "./ScoreCard";
 import { getTodayFixtures } from "./api/soccerApi";
@@ -12,19 +13,6 @@ export default function App() {
 
   const [favouriteClub, setFavouriteClub] = useState(null);
   const [favouriteLeague, setFavouriteLeague] = useState(null);
-
-  const loadMatches = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getTodayFixtures();
-      setMatches(data);
-    } catch (err) {
-      setError("Failed to load matches");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Load saved preferences
   useEffect(() => {
@@ -42,7 +30,20 @@ export default function App() {
     fetchPrefs();
   }, []);
 
+  // Load matches on mount
   useEffect(() => {
+    const loadMatches = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getTodayFixtures();
+        setMatches(data);
+      } catch (err) {
+        setError("Failed to load matches");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadMatches();
   }, []);
 
@@ -56,6 +57,13 @@ export default function App() {
     const value = e.target.value;
     setFavouriteLeague(value);
     if (value) await savePref(USER_ID, "LEAGUE", value);
+  };
+
+  // Reset preferences
+  const resetPreferences = () => {
+    setFavouriteClub(null);
+    setFavouriteLeague(null);
+    // not saving empty to DB right now (could add deletePref API later)
   };
 
   const sortedMatches = [...matches].sort((a, b) => {
@@ -100,28 +108,24 @@ export default function App() {
             className="w-full border p-2 rounded"
           >
             <option value="">-- Select League --</option>
-            {[
-              "Premier League",
-              "La Liga",
-              "Serie A",
-              "Bundesliga",
-              "Ligue 1",
-              "UEFA Champions League",
-            ].map((league) => (
-              <option key={league} value={league}>
-                {league}
-              </option>
-            ))}
+            {["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League"].map(
+              (league) => (
+                <option key={league} value={league}>
+                  {league}
+                </option>
+              )
+            )}
           </select>
         </div>
-      </div>
 
-      <button
-        onClick={loadMatches}
-        className="mb-4 px-3 py-1 bg-blue-500 text-white rounded"
-      >
-        Refresh
-      </button>
+        {/* Reset Button */}
+        <button
+          onClick={resetPreferences}
+          className="mt-2 px-3 py-1 bg-gray-500 text-white rounded"
+        >
+          Reset Preferences
+        </button>
+      </div>
 
       {loading && <p>Loading matches...</p>}
       {error && <p className="text-red-500">{error}</p>}
@@ -134,8 +138,7 @@ export default function App() {
             <ScoreCard
               key={match.id}
               match={match}
-              favTeam={favouriteClub} // 👈 pass down favourite team for crest highlight
-              isFavorite={
+              isFavourite={
                 match.home.name === favouriteClub ||
                 match.away.name === favouriteClub ||
                 match.league === favouriteLeague
