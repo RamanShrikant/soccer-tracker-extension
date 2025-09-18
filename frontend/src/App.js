@@ -1,58 +1,142 @@
-// frontend/src/App.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ScoreCard from "./ScoreCard";
 import { getTodayFixtures } from "./api/soccerApi";
+import { getPrefs, savePref } from "./api/prefsApi";
+
+const USER_ID = "u123"; // static for now
 
 export default function App() {
-  const [fixtures, setFixtures] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [err, setErr] = React.useState("");
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  async function load(force = false) {
-    setLoading(true); setErr("");
+  const [favouriteClub, setFavouriteClub] = useState(null);
+  const [favouriteLeague, setFavouriteLeague] = useState(null);
+
+  const loadMatches = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const rows = await getTodayFixtures(force); // [{id, home, away, status, kickoffIso, league}]
-      setFixtures(rows);
-    } catch (e) {
-      setErr(e?.message || String(e));
+      const data = await getTodayFixtures();
+      setMatches(data);
+    } catch (err) {
+      setError("Failed to load matches");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  React.useEffect(() => { load(false); }, []);
+  // Load saved preferences
+  useEffect(() => {
+    async function fetchPrefs() {
+      try {
+        const prefs = await getPrefs(USER_ID);
+        prefs.forEach((p) => {
+          if (p.prefType === "TEAM") setFavouriteClub(p.valueName);
+          if (p.prefType === "LEAGUE") setFavouriteLeague(p.valueName);
+        });
+      } catch (err) {
+        console.error("Failed to fetch preferences", err);
+      }
+    }
+    fetchPrefs();
+  }, []);
+
+  useEffect(() => {
+    loadMatches();
+  }, []);
+
+  const handleClubChange = async (e) => {
+    const value = e.target.value;
+    setFavouriteClub(value);
+    if (value) await savePref(USER_ID, "TEAM", value);
+  };
+
+  const handleLeagueChange = async (e) => {
+    const value = e.target.value;
+    setFavouriteLeague(value);
+    if (value) await savePref(USER_ID, "LEAGUE", value);
+  };
+
+  const sortedMatches = [...matches].sort((a, b) => {
+    const aFav =
+      a.home.name === favouriteClub ||
+      a.away.name === favouriteClub ||
+      a.league === favouriteLeague;
+    const bFav =
+      b.home.name === favouriteClub ||
+      b.away.name === favouriteClub ||
+      b.league === favouriteLeague;
+    return aFav === bFav ? 0 : aFav ? -1 : 1;
+  });
 
   return (
-    <div className="w-[480px] max-w-[520px] mx-auto px-4 py-3">
-      <h1 className="mb-3 text-2xl font-bold">Today’s Matches</h1>
+    <div className="p-4 w-[400px]">
+      <h1 className="text-xl font-bold mb-3">Today’s Matches</h1>
 
-      <div className="mb-4 flex items-center gap-2">
-        <button
-          onClick={() => load(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-        >
-          Refresh
-        </button>
+      <div className="mb-4 space-y-2">
+        <div>
+          <label className="block text-sm font-medium">Favourite Club</label>
+          <select
+            value={favouriteClub || ""}
+            onChange={handleClubChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">-- Select Club --</option>
+            {matches.map((m) => (
+              <React.Fragment key={m.id}>
+                <option value={m.home.name}>{m.home.name}</option>
+                <option value={m.away.name}>{m.away.name}</option>
+              </React.Fragment>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Favourite League</label>
+          <select
+            value={favouriteLeague || ""}
+            onChange={handleLeagueChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">-- Select League --</option>
+            {["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League"].map(
+              (league) => (
+                <option key={league} value={league}>
+                  {league}
+                </option>
+              )
+            )}
+          </select>
+        </div>
       </div>
 
-      {loading && <p>Loading…</p>}
+      <button
+        onClick={loadMatches}
+        className="mb-4 px-3 py-1 bg-blue-500 text-white rounded"
+      >
+        Refresh
+      </button>
 
-      {err && (
-        <p className="mb-3 rounded-lg bg-yellow-100 px-3 py-2 text-sm text-yellow-900">
-          {err}
-        </p>
-      )}
+      {loading && <p>Loading matches...</p>}
+      {error && <p className="text-red-500">{error}</p>}
 
-      {!loading && !err && fixtures.length === 0 && (
-        <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-          No matches to show (or the API limit was reached).
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {fixtures.map(m => (
-          <ScoreCard key={m.id} match={m} />
-        ))}
+      <div className="space-y-4">
+        {sortedMatches.length === 0 ? (
+          <p>No matches to show</p>
+        ) : (
+          sortedMatches.map((match) => (
+            <ScoreCard
+              key={match.id}
+              match={match}
+              isFavourite={
+                match.home.name === favouriteClub ||
+                match.away.name === favouriteClub ||
+                match.league === favouriteLeague
+              }
+            />
+          ))
+        )}
       </div>
     </div>
   );
