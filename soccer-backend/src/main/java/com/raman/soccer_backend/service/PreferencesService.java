@@ -18,7 +18,7 @@ public class PreferencesService {
 
     public PreferencesService() {
         this.dynamo = DynamoDbClient.builder()
-                .region(Region.US_EAST_1) // adjust to your AWS region
+                .region(Region.US_EAST_2) // ⚡ adjust this to your AWS region
                 .build();
     }
 
@@ -28,10 +28,18 @@ public class PreferencesService {
         item.put("prefType", AttributeValue.builder().s(prefType).build());
         item.put("valueName", AttributeValue.builder().s(valueName).build());
 
-        dynamo.putItem(PutItemRequest.builder()
-                .tableName(table)
-                .item(item)
-                .build());
+        System.out.println("🔎 Saving pref: " + item);
+
+        try {
+            dynamo.putItem(PutItemRequest.builder()
+                    .tableName(table)
+                    .item(item)
+                    .build());
+            System.out.println("✅ Successfully saved preference to DynamoDB");
+        } catch (Exception e) {
+            System.err.println("❌ Error saving pref: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public List<Map<String, String>> getPrefs(String userId) {
@@ -41,15 +49,22 @@ public class PreferencesService {
                 .expressionAttributeValues(Map.of(":u", AttributeValue.builder().s(userId).build()))
                 .build();
 
-        QueryResponse resp = dynamo.query(req);
+        try {
+            QueryResponse resp = dynamo.query(req);
+            System.out.println("🔎 Fetching prefs for userId=" + userId + ", found " + resp.count() + " items");
 
-        List<Map<String, String>> prefs = new ArrayList<>();
-        for (Map<String, AttributeValue> i : resp.items()) {
-            prefs.add(Map.of(
-                    "prefType", i.get("prefType").s(),
-                    "valueName", i.get("valueName").s()
-            ));
+            List<Map<String, String>> prefs = new ArrayList<>();
+            for (Map<String, AttributeValue> i : resp.items()) {
+                prefs.add(Map.of(
+                        "prefType", i.get("prefType").s(),
+                        "valueName", i.get("valueName").s()
+                ));
+            }
+            return prefs;
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching prefs: " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyList();
         }
-        return prefs;
     }
 }
