@@ -100,13 +100,18 @@ export default function App() {
             className="w-full border p-2 rounded"
           >
             <option value="">-- Select League --</option>
-            {["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League"].map(
-              (league) => (
-                <option key={league} value={league}>
-                  {league}
-                </option>
-              )
-            )}
+            {[
+              "Premier League",
+              "La Liga",
+              "Serie A",
+              "Bundesliga",
+              "Ligue 1",
+              "UEFA Champions League",
+            ].map((league) => (
+              <option key={league} value={league}>
+                {league}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -129,7 +134,8 @@ export default function App() {
             <ScoreCard
               key={match.id}
               match={match}
-              isFavourite={
+              favTeam={favouriteClub} // 👈 pass down favourite team for crest highlight
+              isFavorite={
                 match.home.name === favouriteClub ||
                 match.away.name === favouriteClub ||
                 match.league === favouriteLeague

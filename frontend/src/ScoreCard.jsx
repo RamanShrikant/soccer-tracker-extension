@@ -6,40 +6,62 @@ const BADGE_SIZE = "h-16 w-16";
 const CARD_PAD = "p-5";
 
 const initials = (name = "") =>
-  name.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 
-const Crest = ({ name, url }) => {
+const Crest = ({ name, url, highlight }) => {
   const [broken, setBroken] = React.useState(false);
-  return (!url || broken) ? (
-    <div className={`${BADGE_SIZE} rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold`}>
+
+  const baseClasses = `${BADGE_SIZE} rounded-full object-contain bg-white ring-1 ring-gray-200`;
+  const highlightClasses = highlight ? "ring-4 ring-yellow-400" : "";
+
+  return !url || broken ? (
+    <div
+      className={`${BADGE_SIZE} rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold ${highlightClasses}`}
+    >
       {initials(name)}
     </div>
   ) : (
     <img
       src={url}
       alt={`${name} crest`}
-      className={`${BADGE_SIZE} object-contain rounded-full bg-white ring-1 ring-gray-200`}
-      onError={()=>setBroken(true)}
+      className={`${baseClasses} ${highlightClasses}`}
+      onError={() => setBroken(true)}
       draggable={false}
     />
   );
 };
 
-const fmtLocalTime = iso =>
-  iso ? new Date(iso).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) : "";
+const fmtLocalTime = (iso) =>
+  iso
+    ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "";
 
-const onlyGoals = (tl=[]) => tl.filter(ev => /GOAL|PEN|OWN/i.test(ev.type || ""));
+const onlyGoals = (tl = []) => tl.filter((ev) => /GOAL|PEN|OWN/i.test(ev.type || ""));
 
 function ScorersLine({ goals }) {
   if (!goals?.length) return null;
   const txt = goals
-    .map(g => `${g.player || "Unknown"} ${g.minute ?? 0}${g.extra ? `+${g.extra}` : ""}′`)
+    .map(
+      (g) =>
+        `${g.player || "Unknown"} ${g.minute ?? 0}${
+          g.extra ? `+${g.extra}` : ""
+        }′`
+    )
     .join(", ");
-  return <div className="text-sm text-gray-700 text-center leading-tight">{txt}</div>;
+  return (
+    <div className="text-sm text-gray-700 text-center leading-tight">{txt}</div>
+  );
 }
 
-export default function ScoreCard({ match }) {
-  const { id, home={}, away={}, status={}, kickoffIso="", league="" } = match || {};
+export default function ScoreCard({ match, isFavorite, favTeam }) {
+  const { id, home = {}, away = {}, status = {}, kickoffIso = "", league = "" } =
+    match || {};
 
   const [timeline, setTimeline] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
@@ -48,12 +70,19 @@ export default function ScoreCard({ match }) {
   // Center-top text: elapsed, HT, or kickoff time
   const phase = (status.phase || "NS").toUpperCase();
   const centerTop =
-    phase === "IN_PLAY" ? (status.elapsed != null ? `${status.elapsed}′` : "LIVE")
-    : phase === "PAUSED" ? "HT"
-    : fmtLocalTime(kickoffIso) || "—";
+    phase === "IN_PLAY"
+      ? status.elapsed != null
+        ? `${status.elapsed}′`
+        : "LIVE"
+      : phase === "PAUSED"
+      ? "HT"
+      : fmtLocalTime(kickoffIso) || "—";
 
   async function loadDetails() {
-    if (timeline) { setOpen(v=>!v); return; } // already fetched; just toggle
+    if (timeline) {
+      setOpen((v) => !v);
+      return; // already fetched; just toggle
+    }
     try {
       setLoading(true);
       const { timeline: tl } = await getMatchEvents(id); // 1 call; cached in api
@@ -68,27 +97,38 @@ export default function ScoreCard({ match }) {
 
   return (
     <div
-      className={`border-2 border-gray-300 rounded-3xl ${CARD_PAD} bg-white shadow-sm
+      className={`border-2 rounded-3xl ${CARD_PAD} bg-white shadow-sm
                   transition-all duration-200 ease-out
                   hover:border-yellow-400 hover:shadow-lg hover:-translate-y-0.5
-                  focus:border-yellow-400 focus:shadow-lg focus:-translate-y-0.5`}
+                  focus:border-yellow-400 focus:shadow-lg focus:-translate-y-0.5
+                  ${isFavorite ? "ring-4 ring-yellow-400" : "border-gray-300"}`}
     >
       {/* Header */}
       <div className="mb-3 flex items-center justify-between text-sm text-gray-600">
         <span className="font-medium">{league || "League"}</span>
-        <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700">{phase}</span>
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700">
+          {phase}
+        </span>
       </div>
 
       {/* 3-column layout */}
       <div className="grid grid-cols-3 items-center">
         <div className="flex flex-col items-center gap-2">
-          <Crest name={home.name || "Home"} url={home.logo} />
-          <div className="text-sm font-bold text-gray-900 text-center leading-tight">{home.name || "Home"}</div>
+          <Crest
+            name={home.name || "Home"}
+            url={home.logo}
+            highlight={home.name === favTeam}
+          />
+          <div className="text-sm font-bold text-gray-900 text-center leading-tight">
+            {home.name || "Home"}
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-1">
           <div className="text-lg font-medium text-gray-900">{centerTop}</div>
-          <div className="text-2xl font-normal tabular-nums">{(home.score ?? 0)}–{(away.score ?? 0)}</div>
+          <div className="text-2xl font-normal tabular-nums">
+            {home.score ?? 0}–{away.score ?? 0}
+          </div>
 
           {/* Details button / scorers */}
           {!open ? (
@@ -106,8 +146,14 @@ export default function ScoreCard({ match }) {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <Crest name={away.name || "Away"} url={away.logo} />
-          <div className="text-sm font-bold text-gray-900 text-center leading-tight">{away.name || "Away"}</div>
+          <Crest
+            name={away.name || "Away"}
+            url={away.logo}
+            highlight={away.name === favTeam}
+          />
+          <div className="text-sm font-bold text-gray-900 text-center leading-tight">
+            {away.name || "Away"}
+          </div>
         </div>
       </div>
     </div>
