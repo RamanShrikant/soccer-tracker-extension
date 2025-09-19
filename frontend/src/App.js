@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import ScoreCard from "./ScoreCard";
 import { getTodayFixtures } from "./api/soccerApi";
-import { getPrefs, savePref } from "./api/prefsApi";
+import { getPrefs, savePref, deletePrefs } from "./api/prefsApi"; // include deletePrefs
 
 const USER_ID = "u123"; // static for now
 
@@ -59,11 +59,15 @@ export default function App() {
     if (value) await savePref(USER_ID, "LEAGUE", value);
   };
 
-  // Reset preferences
-  const resetPreferences = () => {
+  // Reset preferences (clear state + backend)
+  const resetPreferences = async () => {
     setFavouriteClub(null);
     setFavouriteLeague(null);
-    // TODO: delete from DB as well (next step)
+    try {
+      await deletePrefs(USER_ID);
+    } catch (err) {
+      console.error("Failed to clear preferences", err);
+    }
   };
 
   const sortedMatches = [...matches].sort((a, b) => {
@@ -108,13 +112,18 @@ export default function App() {
             className="w-full border p-2 rounded"
           >
             <option value="">-- Select League --</option>
-            {["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League"].map(
-              (league) => (
-                <option key={league} value={league}>
-                  {league}
-                </option>
-              )
-            )}
+            {[
+              "Premier League",
+              "La Liga",
+              "Serie A",
+              "Bundesliga",
+              "Ligue 1",
+              "UEFA Champions League",
+            ].map((league) => (
+              <option key={league} value={league}>
+                {league}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -142,7 +151,7 @@ export default function App() {
                 match.away.name === favouriteClub ||
                 match.league === favouriteLeague
               }
-              favTeam={favouriteClub}  
+              favTeam={favouriteClub}
             />
           ))
         )}

@@ -19,3 +19,9 @@ export async function savePref(userId, prefType, valueName) {
   );
   if (!res.ok) throw new Error("Failed to save preference");
 }
+
+// ✅ New: delete all prefs for this user
+export async function deletePrefs(userId) {
+  const res = await fetch(`${API_BASE}/${userId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete preferences");
+}
