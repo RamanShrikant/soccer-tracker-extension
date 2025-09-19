@@ -6,12 +6,14 @@ import org.springframework.stereotype.Service;
 public class AiService {
 
     public String getPreMatchAnalysis(String matchId) {
-        // TODO: Replace with real AI logic later
-        return "Pre-match analysis for match " + matchId + ": Expect a tough contest!";
+        // Pretend this is your "prompt" template
+        return "Pre-match analysis for match " + matchId 
+            + ": Summarize expected key players, team form, and style.";
     }
 
     public String getPostMatchSummary(String matchId) {
-        // TODO: Replace with real AI logic later
-        return "Post-match summary for match " + matchId + ": Exciting game, key goals decided it.";
+        // Pretend this is your "prompt" template
+        return "Post-match summary for match " + matchId 
+            + ": Include final score, goal scorers, and highlight moment.";
     }
 }
