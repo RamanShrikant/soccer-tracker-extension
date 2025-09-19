@@ -19,9 +19,8 @@ const Crest = ({ name, url, highlight }) => {
 
   const baseClasses = `${BADGE_SIZE} rounded-full object-contain bg-white ring-1 ring-gray-200`;
   const highlightClasses = highlight
-  ? "ring-2 ring-yellow-300 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]"
-  : "";
-
+    ? "ring-2 ring-yellow-300 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]"
+    : "";
 
   return !url || broken ? (
     <div
@@ -73,6 +72,11 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
+  // NEW: AI state
+  const [aiPreview, setAiPreview] = React.useState("");
+  const [aiSummary, setAiSummary] = React.useState("");
+  const [aiLoading, setAiLoading] = React.useState(false);
+
   const phase = (status.phase || "NS").toUpperCase();
   const centerTop =
     phase === "IN_PLAY"
@@ -95,6 +99,21 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
       setOpen(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchAi(endpoint, setter) {
+    try {
+      setAiLoading(true);
+      const res = await fetch(
+        `https://soccer-tracker-extension.onrender.com/api/ai/${endpoint}/${id}`
+      );
+      const text = await res.text();
+      setter(text);
+    } catch (err) {
+      setter("⚠️ Failed to load AI response");
+    } finally {
+      setAiLoading(false);
     }
   }
 
@@ -138,7 +157,40 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
             {home.score ?? 0}–{away.score ?? 0}
           </div>
 
-          {!open ? (
+          {/* Pre-Match button */}
+          {phase === "NS" && (
+            <>
+              <button
+                onClick={() => fetchAi("preview", setAiPreview)}
+                className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                disabled={aiLoading}
+              >
+                {aiLoading ? "Loading…" : "Pre-Match"}
+              </button>
+              <div className="mt-1 text-xs text-gray-600 text-center">
+                {aiPreview}
+              </div>
+            </>
+          )}
+
+          {/* Post-Match button */}
+          {phase === "FT" && (
+            <>
+              <button
+                onClick={() => fetchAi("summary", setAiSummary)}
+                className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                disabled={aiLoading}
+              >
+                {aiLoading ? "Loading…" : "Post-Match"}
+              </button>
+              <div className="mt-1 text-xs text-gray-600 text-center">
+                {aiSummary}
+              </div>
+            </>
+          )}
+
+          {/* Details button */}
+          {!open && phase !== "FT" && (
             <button
               onClick={loadDetails}
               disabled={loading}
@@ -147,7 +199,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
             >
               {loading ? "Loading…" : "Details"}
             </button>
-          ) : null}
+          )}
         </div>
 
         {/* Away side */}
