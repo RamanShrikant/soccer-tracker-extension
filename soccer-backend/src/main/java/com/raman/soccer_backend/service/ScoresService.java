@@ -69,4 +69,12 @@ public class ScoresService {
             return Collections.emptyList();
         }
     }
+
+    // <-- outside getTodayMatches()
+    public Map<String, Object> getMatchById(String matchId) {
+        return getTodayMatches().stream()
+                .filter(m -> matchId.equals(m.get("id")))
+                .findFirst()
+                .orElse(null);
+    }
 }
