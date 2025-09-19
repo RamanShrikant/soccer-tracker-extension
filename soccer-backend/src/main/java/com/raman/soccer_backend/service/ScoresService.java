@@ -20,6 +20,7 @@ public class ScoresService {
                 .build();
     }
 
+    // ✅ Fetch all matches for today
     public List<Map<String, Object>> getTodayMatches() {
         String today = LocalDate.now().toString();
 
@@ -29,38 +30,12 @@ public class ScoresService {
                     .retrieve()
                     .body(JsonNode.class);
 
-            System.out.println("✅ Querying matches for: " + today);
-            System.out.println("Football-Data API response: " + root.toPrettyString());
-
             List<Map<String, Object>> matches = new ArrayList<>();
 
             for (JsonNode m : root.path("matches")) {
-                Map<String, Object> match = new HashMap<>();
-                match.put("id", m.path("id").asText());
-                match.put("league", m.path("competition").path("name").asText());
-                match.put("kickoffIso", m.path("utcDate").asText());
-
-                Map<String, Object> home = new HashMap<>();
-                home.put("name", m.path("homeTeam").path("name").asText());
-                home.put("logo", m.path("homeTeam").path("crest").asText(null));
-                home.put("score", m.path("score").path("fullTime").path("home").isInt()
-                        ? m.path("score").path("fullTime").path("home").asInt()
-                        : null);
-
-                Map<String, Object> away = new HashMap<>();
-                away.put("name", m.path("awayTeam").path("name").asText());
-                away.put("logo", m.path("awayTeam").path("crest").asText(null));
-                away.put("score", m.path("score").path("fullTime").path("away").isInt()
-                        ? m.path("score").path("fullTime").path("away").asInt()
-                        : null);
-
-                match.put("home", home);
-                match.put("away", away);
-
-                matches.add(match);
+                matches.add(parseMatch(m));
             }
 
-            System.out.println("✅ Found " + matches.size() + " matches");
             return matches;
 
         } catch (Exception e) {
@@ -70,7 +45,7 @@ public class ScoresService {
         }
     }
 
-    // 🔥 NEW METHOD: fetch a match directly by ID
+    // ✅ Fetch a single match directly by ID
     public Map<String, Object> getMatchById(String matchId) {
         try {
             JsonNode root = client.get()
@@ -78,41 +53,40 @@ public class ScoresService {
                     .retrieve()
                     .body(JsonNode.class);
 
-            JsonNode m = root.path("match"); // football-data wraps single match under "match"
-
-            if (m.isMissingNode() || m.isNull()) {
-                System.err.println("❌ No match found for ID: " + matchId);
-                return null;
-            }
-
-            Map<String, Object> match = new HashMap<>();
-            match.put("id", m.path("id").asText());
-            match.put("league", m.path("competition").path("name").asText());
-            match.put("kickoffIso", m.path("utcDate").asText());
-
-            Map<String, Object> home = new HashMap<>();
-            home.put("name", m.path("homeTeam").path("name").asText());
-            home.put("logo", m.path("homeTeam").path("crest").asText(null));
-            home.put("score", m.path("score").path("fullTime").path("home").isInt()
-                    ? m.path("score").path("fullTime").path("home").asInt()
-                    : null);
-
-            Map<String, Object> away = new HashMap<>();
-            away.put("name", m.path("awayTeam").path("name").asText());
-            away.put("logo", m.path("awayTeam").path("crest").asText(null));
-            away.put("score", m.path("score").path("fullTime").path("away").isInt()
-                    ? m.path("score").path("fullTime").path("away").asInt()
-                    : null);
-
-            match.put("home", home);
-            match.put("away", away);
-
-            return match;
+            // API already returns the match at the top-level
+            return parseMatch(root);
 
         } catch (Exception e) {
             System.err.println("❌ Error fetching match by ID: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
+    }
+
+    // ✅ Helper to parse one match JSON into a Map
+    private Map<String, Object> parseMatch(JsonNode m) {
+        Map<String, Object> match = new HashMap<>();
+        match.put("id", m.path("id").asText());
+        match.put("league", m.path("competition").path("name").asText());
+        match.put("kickoffIso", m.path("utcDate").asText());
+
+        Map<String, Object> home = new HashMap<>();
+        home.put("name", m.path("homeTeam").path("name").asText());
+        home.put("logo", m.path("homeTeam").path("crest").asText(null));
+        home.put("score", m.path("score").path("fullTime").path("home").isInt()
+                ? m.path("score").path("fullTime").path("home").asInt()
+                : null);
+
+        Map<String, Object> away = new HashMap<>();
+        away.put("name", m.path("awayTeam").path("name").asText());
+        away.put("logo", m.path("awayTeam").path("crest").asText(null));
+        away.put("score", m.path("score").path("fullTime").path("away").isInt()
+                ? m.path("score").path("fullTime").path("away").asInt()
+                : null);
+
+        match.put("home", home);
+        match.put("away", away);
+
+        return match;
     }
 }
