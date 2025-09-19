@@ -70,11 +70,49 @@ public class ScoresService {
         }
     }
 
-    // <-- outside getTodayMatches()
+    // 🔥 NEW METHOD: fetch a match directly by ID
     public Map<String, Object> getMatchById(String matchId) {
-        return getTodayMatches().stream()
-                .filter(m -> matchId.equals(m.get("id")))
-                .findFirst()
-                .orElse(null);
+        try {
+            JsonNode root = client.get()
+                    .uri("/matches/" + matchId)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            JsonNode m = root.path("match"); // football-data wraps single match under "match"
+
+            if (m.isMissingNode() || m.isNull()) {
+                System.err.println("❌ No match found for ID: " + matchId);
+                return null;
+            }
+
+            Map<String, Object> match = new HashMap<>();
+            match.put("id", m.path("id").asText());
+            match.put("league", m.path("competition").path("name").asText());
+            match.put("kickoffIso", m.path("utcDate").asText());
+
+            Map<String, Object> home = new HashMap<>();
+            home.put("name", m.path("homeTeam").path("name").asText());
+            home.put("logo", m.path("homeTeam").path("crest").asText(null));
+            home.put("score", m.path("score").path("fullTime").path("home").isInt()
+                    ? m.path("score").path("fullTime").path("home").asInt()
+                    : null);
+
+            Map<String, Object> away = new HashMap<>();
+            away.put("name", m.path("awayTeam").path("name").asText());
+            away.put("logo", m.path("awayTeam").path("crest").asText(null));
+            away.put("score", m.path("score").path("fullTime").path("away").isInt()
+                    ? m.path("score").path("fullTime").path("away").asInt()
+                    : null);
+
+            match.put("home", home);
+            match.put("away", away);
+
+            return match;
+
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching match by ID: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 }
