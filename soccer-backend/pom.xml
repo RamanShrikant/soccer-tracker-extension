@@ -46,6 +46,13 @@
             <artifactId>dynamodb</artifactId>
             <version>${aws.sdk.version}</version>
         </dependency>
+<dependency>
+  <groupId>com.openai</groupId>
+  <artifactId>openai</artifactId>
+  <version>0.22.0</version>
+</dependency>
+
+
     </dependencies>
 
     <build>

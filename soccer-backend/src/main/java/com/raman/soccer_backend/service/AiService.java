@@ -1,20 +1,21 @@
 package com.raman.soccer_backend.service;
 
-import com.theokanning.openai.service.OpenAiService;
-import com.theokanning.openai.completion.chat.ChatCompletionRequest;
-import com.theokanning.openai.completion.chat.ChatMessage;
+import com.openai.client.OpenAIClient;
+import com.openai.client.OpenAI;
+import com.openai.types.chat.ChatCompletionCreateParams;
+import com.openai.types.chat.ChatCompletion;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import java.util.Arrays;
 
 @Service
 public class AiService {
 
-    private final OpenAiService openAiService;
+    private final OpenAIClient client;
 
     public AiService(@Value("${openai.api.key}") String apiKey) {
-        this.openAiService = new OpenAiService(apiKey);
+        this.client = OpenAI.builder()
+                .apiKey(apiKey)
+                .build();
     }
 
     public String getPreMatchAnalysis(String matchId) {
@@ -28,17 +29,15 @@ public class AiService {
     }
 
     private String askOpenAi(String prompt) {
-        ChatCompletionRequest request = ChatCompletionRequest.builder()
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                 .model("gpt-4o-mini")
-                .messages(Arrays.asList(new ChatMessage("user", prompt)))
-                .maxTokens(150)
+                .addMessage(ChatCompletionCreateParams.Message.ofUser(prompt))
+                .maxTokens(150L)
                 .temperature(0.7)
                 .build();
 
-        return openAiService.createChatCompletion(request)
-                .getChoices()
-                .get(0)
-                .getMessage()
-                .getContent();
+        ChatCompletion completion = client.chat().completions().create(params);
+
+        return completion.getChoices().get(0).getMessage().getContent();
     }
 }
