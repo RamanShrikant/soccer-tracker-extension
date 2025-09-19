@@ -30,7 +30,7 @@ export default function App() {
     fetchPrefs();
   }, []);
 
-  // Load matches on mount
+  // Load matches
   useEffect(() => {
     const loadMatches = async () => {
       setLoading(true);
@@ -63,7 +63,7 @@ export default function App() {
   const resetPreferences = () => {
     setFavouriteClub(null);
     setFavouriteLeague(null);
-    // not saving empty to DB right now (could add deletePref API later)
+    // TODO: delete from DB as well (next step)
   };
 
   const sortedMatches = [...matches].sort((a, b) => {
@@ -118,7 +118,6 @@ export default function App() {
           </select>
         </div>
 
-        {/* Reset Button */}
         <button
           onClick={resetPreferences}
           className="mt-2 px-3 py-1 bg-gray-500 text-white rounded"
@@ -138,11 +137,12 @@ export default function App() {
             <ScoreCard
               key={match.id}
               match={match}
-              isFavourite={
+              isFavorite={
                 match.home.name === favouriteClub ||
                 match.away.name === favouriteClub ||
                 match.league === favouriteLeague
               }
+              favTeam={favouriteClub}  
             />
           ))
         )}

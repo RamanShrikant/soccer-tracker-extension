@@ -18,7 +18,10 @@ const Crest = ({ name, url, highlight }) => {
   const [broken, setBroken] = React.useState(false);
 
   const baseClasses = `${BADGE_SIZE} rounded-full object-contain bg-white ring-1 ring-gray-200`;
-  const highlightClasses = highlight ? "ring-4 ring-yellow-400" : "";
+  const highlightClasses = highlight
+  ? "ring-2 ring-yellow-300 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]"
+  : "";
+
 
   return !url || broken ? (
     <div
