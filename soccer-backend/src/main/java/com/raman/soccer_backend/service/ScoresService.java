@@ -13,7 +13,9 @@ public class ScoresService {
 
     private final RestClient client;
 
+    // ✅ Debug API key length when service starts
     public ScoresService(@Value("${sportsopendata.key:}") String apiKey) {
+        System.out.println("🔑 Loaded API key (length): " + (apiKey == null ? "null" : apiKey.length()));
         this.client = RestClient.builder()
                 .baseUrl("https://api.football-data.org/v4")
                 .defaultHeader("X-Auth-Token", apiKey)
@@ -31,7 +33,6 @@ public class ScoresService {
                     .body(JsonNode.class);
 
             List<Map<String, Object>> matches = new ArrayList<>();
-
             for (JsonNode m : root.path("matches")) {
                 matches.add(parseMatch(m));
             }
