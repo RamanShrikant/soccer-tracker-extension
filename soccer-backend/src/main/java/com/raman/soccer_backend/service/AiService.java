@@ -48,21 +48,22 @@ public class AiService {
         return callOpenAi("Write a 2–4 sentence post-match summary:\n" + facts);
     }
 
-    // ✅ Pre-match analysis (renamed to match AiController)
-    public String getPreMatchAnalysis(int leagueId, int season,
-                                      int homeId, String homeName,
-                                      int awayId, String awayName) {
+    // ✅ Pre-match analysis — matches controller signature
+    public String getPreMatchAnalysis(String homeName, String awayName,
+                                      String kickoff, String league,
+                                      int homeId, int awayId) {
 
+        // Get recent form
         List<String> homeForm = scoresService.getRecentForm(homeId, 5);
         List<String> awayForm = scoresService.getRecentForm(awayId, 5);
 
+        // Get head-to-head
         List<Map<String, Object>> h2h = scoresService.getHeadToHead(homeId, awayId, 5);
-
-        Map<String, Object> homeStanding = scoresService.getTeamStanding(leagueId, season, homeId);
-        Map<String, Object> awayStanding = scoresService.getTeamStanding(leagueId, season, awayId);
 
         StringBuilder facts = new StringBuilder("Upcoming match: ")
                 .append(homeName).append(" vs ").append(awayName).append(".\n");
+
+        facts.append("Kickoff: ").append(kickoff).append(", League: ").append(league).append("\n");
 
         facts.append("Recent form: ")
                 .append(homeName).append(" -> ").append(String.join("", homeForm))
@@ -71,21 +72,15 @@ public class AiService {
         if (!h2h.isEmpty()) {
             facts.append("Head-to-head (last ").append(h2h.size()).append(" meetings):\n");
             for (Map<String, Object> m : h2h) {
-                facts.append(((Map<?, ?>) m.get("home")).get("name")).append(" ")
-                        .append(((Map<?, ?>) m.get("home")).get("score"))
+                Map<String, Object> home = (Map<String, Object>) m.get("home");
+                Map<String, Object> away = (Map<String, Object>) m.get("away");
+                facts.append(home.get("name")).append(" ")
+                        .append(home.get("score"))
                         .append(" – ")
-                        .append(((Map<?, ?>) m.get("away")).get("score")).append(" ")
-                        .append(((Map<?, ?>) m.get("away")).get("name"))
+                        .append(away.get("score")).append(" ")
+                        .append(away.get("name"))
                         .append(" (").append(m.get("kickoffIso")).append(")\n");
             }
-        }
-
-        if (homeStanding != null && awayStanding != null) {
-            facts.append("Standings: ")
-                    .append(homeName).append(" #").append(homeStanding.get("rank"))
-                    .append(" (").append(homeStanding.get("points")).append(" pts), ")
-                    .append(awayName).append(" #").append(awayStanding.get("rank"))
-                    .append(" (").append(awayStanding.get("points")).append(" pts).\n");
         }
 
         return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts);

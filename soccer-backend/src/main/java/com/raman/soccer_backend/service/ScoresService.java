@@ -100,10 +100,10 @@ public class ScoresService {
         match.put("league", m.path("league").path("name").asText());
         match.put("kickoffIso", m.path("fixture").path("date").asText());
 
-    match.put("leagueId", m.path("league").path("id").asInt());
-    match.put("season", m.path("league").path("season").asInt());
-    match.put("homeId", m.path("teams").path("home").path("id").asInt());
-    match.put("awayId", m.path("teams").path("away").path("id").asInt());
+        match.put("leagueId", m.path("league").path("id").asInt());
+        match.put("season", m.path("league").path("season").asInt());
+        match.put("homeId", m.path("teams").path("home").path("id").asInt());
+        match.put("awayId", m.path("teams").path("away").path("id").asInt());
 
         Map<String, Object> home = new HashMap<>();
         home.put("name", m.path("teams").path("home").path("name").asText());
@@ -124,68 +124,88 @@ public class ScoresService {
 
         return match;
     }
+
     // ✅ Get last N matches for a team (recent form)
-public List<String> getRecentForm(int teamId, int lastN) {
-    try {
-        JsonNode root = client.get()
-                .uri("/fixtures?team=" + teamId + "&last=" + lastN)
-                .retrieve()
-                .body(JsonNode.class);
+    public List<String> getRecentForm(int teamId, int lastN) {
+        try {
+            JsonNode root = client.get()
+                    .uri("/fixtures?team=" + teamId + "&last=" + lastN)
+                    .retrieve()
+                    .body(JsonNode.class);
 
-        List<String> form = new ArrayList<>();
-        for (JsonNode f : root.path("response")) {
-            String result;
-            int homeGoals = f.path("goals").path("home").asInt();
-            int awayGoals = f.path("goals").path("away").asInt();
-            int fixtureId = f.path("fixture").path("id").asInt();
-            boolean isHome = f.path("teams").path("home").path("id").asInt() == teamId;
+            List<String> form = new ArrayList<>();
+            for (JsonNode f : root.path("response")) {
+                String result;
+                int homeGoals = f.path("goals").path("home").asInt();
+                int awayGoals = f.path("goals").path("away").asInt();
+                boolean isHome = f.path("teams").path("home").path("id").asInt() == teamId;
 
-            if (homeGoals == awayGoals) {
-                result = "D"; // draw
-            } else if ((isHome && homeGoals > awayGoals) || (!isHome && awayGoals > homeGoals)) {
-                result = "W"; // win
-            } else {
-                result = "L"; // loss
+                if (homeGoals == awayGoals) {
+                    result = "D"; // draw
+                } else if ((isHome && homeGoals > awayGoals) || (!isHome && awayGoals > homeGoals)) {
+                    result = "W"; // win
+                } else {
+                    result = "L"; // loss
+                }
+
+                form.add(result);
             }
+            return form;
 
-            form.add(result);
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching recent form: " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyList();
         }
-        return form;
-
-    } catch (Exception e) {
-        System.err.println("❌ Error fetching recent form: " + e.getMessage());
-        e.printStackTrace();
-        return Collections.emptyList();
     }
-}
 
-// ✅ Get current league standings
-public Map<String, Object> getTeamStanding(int leagueId, int season, int teamId) {
-    try {
-        JsonNode root = client.get()
-                .uri("/standings?league=" + leagueId + "&season=" + season)
-                .retrieve()
-                .body(JsonNode.class);
+    // ✅ Get current league standings
+    public Map<String, Object> getTeamStanding(int leagueId, int season, int teamId) {
+        try {
+            JsonNode root = client.get()
+                    .uri("/standings?league=" + leagueId + "&season=" + season)
+                    .retrieve()
+                    .body(JsonNode.class);
 
-        for (JsonNode league : root.path("response")) {
-            JsonNode table = league.path("league").path("standings").get(0); // usually array of arrays
-            for (JsonNode row : table) {
-                if (row.path("team").path("id").asInt() == teamId) {
-                    Map<String, Object> standing = new HashMap<>();
-                    standing.put("rank", row.path("rank").asInt());
-                    standing.put("points", row.path("points").asInt());
-                    standing.put("played", row.path("all").path("played").asInt());
-                    return standing;
+            for (JsonNode league : root.path("response")) {
+                JsonNode table = league.path("league").path("standings").get(0); // usually array of arrays
+                for (JsonNode row : table) {
+                    if (row.path("team").path("id").asInt() == teamId) {
+                        Map<String, Object> standing = new HashMap<>();
+                        standing.put("rank", row.path("rank").asInt());
+                        standing.put("points", row.path("points").asInt());
+                        standing.put("played", row.path("all").path("played").asInt());
+                        return standing;
+                    }
                 }
             }
+            return null;
+
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching standings: " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
-        return null;
-
-    } catch (Exception e) {
-        System.err.println("❌ Error fetching standings: " + e.getMessage());
-        e.printStackTrace();
-        return null;
     }
-}
 
+    // ✅ Fetch head-to-head results between two teams
+    public List<Map<String, Object>> getHeadToHead(int homeId, int awayId, int last) {
+        try {
+            JsonNode root = client.get()
+                    .uri("/fixtures/headtohead?h2h=" + homeId + "-" + awayId + "&last=" + last)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            List<Map<String, Object>> matches = new ArrayList<>();
+            for (JsonNode m : root.path("response")) {
+                matches.add(parseMatch(m));
+            }
+            return matches;
+
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching head-to-head: " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
+    }
 }

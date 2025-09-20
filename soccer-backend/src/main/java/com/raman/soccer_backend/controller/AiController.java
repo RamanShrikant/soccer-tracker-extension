@@ -14,7 +14,7 @@ public class AiController {
         this.aiService = aiService;
     }
 
-    // ✅ Pre-match preview — now includes team IDs for H2H
+    // ✅ Pre-match preview
     @GetMapping("/preview")
     public String getPreMatch(@RequestParam String home,
                               @RequestParam String away,
@@ -25,7 +25,7 @@ public class AiController {
         return aiService.getPreMatchAnalysis(home, away, kickoff, league, homeId, awayId);
     }
 
-    // ✅ Post-match recap — uses matchId to fetch events
+    // ✅ Post-match recap
     @GetMapping("/summary")
     public String getPostMatch(@RequestParam String matchId,
                                @RequestParam String home,
