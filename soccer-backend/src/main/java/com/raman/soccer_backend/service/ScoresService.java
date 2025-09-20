@@ -13,12 +13,11 @@ public class ScoresService {
 
     private final RestClient client;
 
-    // ✅ Debug API key length when service starts
-    public ScoresService(@Value("${sportsopendata.key:}") String apiKey) {
+    public ScoresService(@Value("${apifootball.key:}") String apiKey) {
         System.out.println("🔑 Loaded API key (length): " + (apiKey == null ? "null" : apiKey.length()));
         this.client = RestClient.builder()
-                .baseUrl("https://api.football-data.org/v4")
-                .defaultHeader("X-Auth-Token", apiKey)
+                .baseUrl("https://v3.football.api-sports.io")
+                .defaultHeader("x-apisports-key", apiKey)
                 .build();
     }
 
@@ -28,15 +27,14 @@ public class ScoresService {
 
         try {
             JsonNode root = client.get()
-                    .uri("/matches?competitions=PL,PD,SA,BL1,FL1,CL&dateFrom=" + today + "&dateTo=" + today)
+                    .uri("/fixtures?date=" + today + "&timezone=UTC")
                     .retrieve()
                     .body(JsonNode.class);
 
             List<Map<String, Object>> matches = new ArrayList<>();
-            for (JsonNode m : root.path("matches")) {
+            for (JsonNode m : root.path("response")) {
                 matches.add(parseMatch(m));
             }
-
             return matches;
 
         } catch (Exception e) {
@@ -50,12 +48,15 @@ public class ScoresService {
     public Map<String, Object> getMatchById(String matchId) {
         try {
             JsonNode root = client.get()
-                    .uri("/matches/" + matchId)
+                    .uri("/fixtures?id=" + matchId)
                     .retrieve()
                     .body(JsonNode.class);
 
-            // API already returns the match at the top-level
-            return parseMatch(root);
+            JsonNode arr = root.path("response");
+            if (arr.isArray() && arr.size() > 0) {
+                return parseMatch(arr.get(0));
+            }
+            return null;
 
         } catch (Exception e) {
             System.err.println("❌ Error fetching match by ID: " + e.getMessage());
@@ -64,25 +65,58 @@ public class ScoresService {
         }
     }
 
+    // ✅ Fetch timeline / events for a match
+    public List<Map<String, Object>> getMatchEvents(String matchId) {
+        try {
+            JsonNode root = client.get()
+                    .uri("/fixtures/events?fixture=" + matchId)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            List<Map<String, Object>> events = new ArrayList<>();
+            for (JsonNode ev : root.path("response")) {
+                Map<String, Object> event = new HashMap<>();
+                event.put("minute", ev.path("time").path("elapsed").asInt(0));
+                event.put("extra", ev.path("time").path("extra").isInt() ? ev.path("time").path("extra").asInt() : null);
+                event.put("type", ev.path("type").asText());
+                event.put("detail", ev.path("detail").asText());
+                event.put("player", ev.path("player").path("name").asText());
+                event.put("team", ev.path("team").path("name").asText());
+                events.add(event);
+            }
+            return events;
+
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching match events: " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
+    }
+
     // ✅ Helper to parse one match JSON into a Map
     private Map<String, Object> parseMatch(JsonNode m) {
         Map<String, Object> match = new HashMap<>();
-        match.put("id", m.path("id").asText());
-        match.put("league", m.path("competition").path("name").asText());
-        match.put("kickoffIso", m.path("utcDate").asText());
+        match.put("id", m.path("fixture").path("id").asText());
+        match.put("league", m.path("league").path("name").asText());
+        match.put("kickoffIso", m.path("fixture").path("date").asText());
+
+    match.put("leagueId", m.path("league").path("id").asInt());
+    match.put("season", m.path("league").path("season").asInt());
+    match.put("homeId", m.path("teams").path("home").path("id").asInt());
+    match.put("awayId", m.path("teams").path("away").path("id").asInt());
 
         Map<String, Object> home = new HashMap<>();
-        home.put("name", m.path("homeTeam").path("name").asText());
-        home.put("logo", m.path("homeTeam").path("crest").asText(null));
-        home.put("score", m.path("score").path("fullTime").path("home").isInt()
-                ? m.path("score").path("fullTime").path("home").asInt()
+        home.put("name", m.path("teams").path("home").path("name").asText());
+        home.put("logo", m.path("teams").path("home").path("logo").asText(null));
+        home.put("score", m.path("goals").path("home").isInt()
+                ? m.path("goals").path("home").asInt()
                 : null);
 
         Map<String, Object> away = new HashMap<>();
-        away.put("name", m.path("awayTeam").path("name").asText());
-        away.put("logo", m.path("awayTeam").path("crest").asText(null));
-        away.put("score", m.path("score").path("fullTime").path("away").isInt()
-                ? m.path("score").path("fullTime").path("away").asInt()
+        away.put("name", m.path("teams").path("away").path("name").asText());
+        away.put("logo", m.path("teams").path("away").path("logo").asText(null));
+        away.put("score", m.path("goals").path("away").isInt()
+                ? m.path("goals").path("away").asInt()
                 : null);
 
         match.put("home", home);
@@ -90,4 +124,68 @@ public class ScoresService {
 
         return match;
     }
+    // ✅ Get last N matches for a team (recent form)
+public List<String> getRecentForm(int teamId, int lastN) {
+    try {
+        JsonNode root = client.get()
+                .uri("/fixtures?team=" + teamId + "&last=" + lastN)
+                .retrieve()
+                .body(JsonNode.class);
+
+        List<String> form = new ArrayList<>();
+        for (JsonNode f : root.path("response")) {
+            String result;
+            int homeGoals = f.path("goals").path("home").asInt();
+            int awayGoals = f.path("goals").path("away").asInt();
+            int fixtureId = f.path("fixture").path("id").asInt();
+            boolean isHome = f.path("teams").path("home").path("id").asInt() == teamId;
+
+            if (homeGoals == awayGoals) {
+                result = "D"; // draw
+            } else if ((isHome && homeGoals > awayGoals) || (!isHome && awayGoals > homeGoals)) {
+                result = "W"; // win
+            } else {
+                result = "L"; // loss
+            }
+
+            form.add(result);
+        }
+        return form;
+
+    } catch (Exception e) {
+        System.err.println("❌ Error fetching recent form: " + e.getMessage());
+        e.printStackTrace();
+        return Collections.emptyList();
+    }
+}
+
+// ✅ Get current league standings
+public Map<String, Object> getTeamStanding(int leagueId, int season, int teamId) {
+    try {
+        JsonNode root = client.get()
+                .uri("/standings?league=" + leagueId + "&season=" + season)
+                .retrieve()
+                .body(JsonNode.class);
+
+        for (JsonNode league : root.path("response")) {
+            JsonNode table = league.path("league").path("standings").get(0); // usually array of arrays
+            for (JsonNode row : table) {
+                if (row.path("team").path("id").asInt() == teamId) {
+                    Map<String, Object> standing = new HashMap<>();
+                    standing.put("rank", row.path("rank").asInt());
+                    standing.put("points", row.path("points").asInt());
+                    standing.put("played", row.path("all").path("played").asInt());
+                    return standing;
+                }
+            }
+        }
+        return null;
+
+    } catch (Exception e) {
+        System.err.println("❌ Error fetching standings: " + e.getMessage());
+        e.printStackTrace();
+        return null;
+    }
+}
+
 }

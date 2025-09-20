@@ -77,7 +77,9 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   const [aiSummary, setAiSummary] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
 
-  const phase = (status.phase || "NS").toUpperCase();
+  let phase = (status.phase || "NS").toUpperCase();
+  if (phase === "FINISHED") phase = "FT"; // normalize
+
   const centerTop =
     phase === "IN_PLAY"
       ? status.elapsed != null
