@@ -25,86 +25,87 @@ public class AiService {
         this.scoresService = scoresService;
     }
 
-    // ✅ Post-match recap using real events
-    public String getPostMatchSummary(String matchId, String homeName, int homeScore, String awayName, int awayScore) {
+    // ✅ Post-match recap using events + result
+    public String getPostMatchSummary(String matchId, String homeName, int homeScore,
+                                      String awayName, int awayScore) {
         List<Map<String, Object>> events = scoresService.getMatchEvents(matchId);
 
         StringBuilder facts = new StringBuilder("Match result: ")
-                .append(homeName).append(" ").append(homeScore).append(" – ")
-                .append(awayScore).append(" ").append(awayName).append(".\n");
+                .append(homeName).append(" ").append(homeScore)
+                .append(" – ").append(awayScore).append(" ").append(awayName).append(".\n");
 
         if (!events.isEmpty()) {
             facts.append("Events:\n");
             for (Map<String, Object> ev : events) {
-                String type = (String) ev.get("type");
-                String detail = (String) ev.get("detail");
-                String player = (String) ev.get("player");
-                String team = (String) ev.get("team");
-                int minute = ev.get("minute") != null ? (Integer) ev.get("minute") : 0;
-
-                if ("Goal".equalsIgnoreCase(type)) {
-                    facts.append("- ").append(player).append(" scored for ").append(team)
-                            .append(" (").append(minute).append("′)\n");
-                } else if ("Card".equalsIgnoreCase(type)) {
-                    facts.append("- ").append(player).append(" received a ").append(detail)
-                            .append(" (").append(team).append(", ").append(minute).append("′)\n");
-                } else if ("subst".equalsIgnoreCase(type)) {
-                    facts.append("- Substitution for ").append(team).append(": ").append(detail)
-                            .append(" (").append(minute).append("′)\n");
-                }
+                facts.append(ev.get("minute")).append("' ")
+                        .append(ev.get("team")).append(" - ")
+                        .append(ev.get("player")).append(" (")
+                        .append(ev.get("type")).append(": ")
+                        .append(ev.get("detail")).append(")\n");
             }
         }
 
-        String prompt = facts + "\nWrite a concise 2-sentence recap of this match, using only the listed events. Do not invent players or goals.";
-
-        return askOpenAi(prompt);
+        return callOpenAi("Write a 2–4 sentence post-match summary:\n" + facts);
     }
 
-    // ✅ Pre-match preview using H2H
-    public String getPreMatchAnalysis(String homeName, String awayName, String kickoffIso, String league,
-                                      int homeId, int awayId) {
+    // ✅ Pre-match preview using form + head-to-head + standings
+    public String getPreMatchSummary(int leagueId, int season,
+                                     int homeId, String homeName,
+                                     int awayId, String awayName) {
+
+        // Recent form
+        List<String> homeForm = scoresService.getRecentForm(homeId, 5);
+        List<String> awayForm = scoresService.getRecentForm(awayId, 5);
+
+        // Head-to-head
         List<Map<String, Object>> h2h = scoresService.getHeadToHead(homeId, awayId, 5);
 
+        // Standings
+        Map<String, Object> homeStanding = scoresService.getTeamStanding(leagueId, season, homeId);
+        Map<String, Object> awayStanding = scoresService.getTeamStanding(leagueId, season, awayId);
+
         StringBuilder facts = new StringBuilder("Upcoming match: ")
-                .append(homeName).append(" vs ").append(awayName)
-                .append(" in the ").append(league)
-                .append(". Kickoff at ").append(kickoffIso).append(".\n");
+                .append(homeName).append(" vs ").append(awayName).append(".\n");
+
+        facts.append("Recent form (last 5): ")
+                .append(homeName).append(" -> ").append(String.join("", homeForm))
+                .append(", ").append(awayName).append(" -> ").append(String.join("", awayForm)).append("\n");
 
         if (!h2h.isEmpty()) {
-            int homeWins = 0, awayWins = 0, draws = 0;
+            facts.append("Head-to-head (last ").append(h2h.size()).append(" meetings):\n");
             for (Map<String, Object> m : h2h) {
-                int hs = (int) m.get("homeScore");
-                int as = (int) m.get("awayScore");
-                if (hs == as) draws++;
-                else if (m.get("home").equals(homeName) && hs > as) homeWins++;
-                else if (m.get("away").equals(homeName) && as > hs) homeWins++;
-                else if (m.get("home").equals(awayName) && hs > as) awayWins++;
-                else if (m.get("away").equals(awayName) && as > hs) awayWins++;
+                facts.append(m.get("home")).append(" ")
+                        .append(((Map<?, ?>) m.get("home")).get("score"))
+                        .append(" – ")
+                        .append(((Map<?, ?>) m.get("away")).get("score"))
+                        .append(" ").append(((Map<?, ?>) m.get("away")).get("name"))
+                        .append(" (").append(m.get("kickoffIso")).append(")\n");
             }
-            facts.append("Head-to-head (last 5): ")
-                 .append(homeName).append(" ").append(homeWins).append("W, ")
-                 .append(awayName).append(" ").append(awayWins).append("W, ")
-                 .append(draws).append("D.\n");
         }
 
-        String prompt = facts + "Write a short 2-sentence preview for fans, highlighting the head-to-head record but not inventing details.";
+        if (homeStanding != null && awayStanding != null) {
+            facts.append("Standings: ")
+                    .append(homeName).append(" #").append(homeStanding.get("rank"))
+                    .append(" (").append(homeStanding.get("points")).append(" pts), ")
+                    .append(awayName).append(" #").append(awayStanding.get("rank"))
+                    .append(" (").append(awayStanding.get("points")).append(" pts).\n");
+        }
 
-        return askOpenAi(prompt);
+        return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts);
     }
 
-    // ✅ Ask GPT
-    private String askOpenAi(String prompt) {
-        ChatCompletionRequest request = ChatCompletionRequest.builder()
-                .model("gpt-3.5-turbo")
-                .messages(List.of(new ChatMessage("user", prompt)))
-                .maxTokens(200)
-                .temperature(0.5)
+    // 🔧 Utility method to call OpenAI
+    private String callOpenAi(String prompt) {
+        ChatCompletionRequest req = ChatCompletionRequest.builder()
+                .model("gpt-4o-mini")
+                .messages(List.of(
+                        new ChatMessage("system", "You are a football commentator. Be concise but insightful."),
+                        new ChatMessage("user", prompt)
+                ))
+                .maxTokens(250)
                 .build();
 
-        return service.createChatCompletion(request)
-                .getChoices()
-                .get(0)
-                .getMessage()
-                .getContent();
+        return service.createChatCompletion(req)
+                .getChoices().get(0).getMessage().getContent();
     }
 }
