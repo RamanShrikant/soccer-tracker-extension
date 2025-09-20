@@ -1,21 +1,13 @@
 // frontend/src/api/soccerApi.js
-// API-FOOTBALL adapter with key rotation, Big-5+UCL filter, and small caches.
+// Talk only to backend; API key stays hidden in backend env vars
 
-const BASE = "https://v3.football.api-sports.io";
-
-const API_KEYS = [
-  "f131abfca7cc5bdcb764a31187cbbe85",
-];
-let keyIndex = 0;
-
-const USE_HEADER_KEY = true;
-const HEADER_NAME = "x-apisports-key";
+const BASE = "https://soccer-tracker-extension.onrender.com/api/scores";
 
 // --- caches (2 minutes) ---
 const FIXTURE_TTL_MS = 2 * 60 * 1000;
 const EVENTS_TTL_MS  = 2 * 60 * 1000;
-const fixturesCache = new Map(); // date -> { data, ts }
-const eventsCache   = new Map(); // matchId -> { timeline, ts }
+const fixturesCache = new Map();
+const eventsCache   = new Map();
 
 // Keep only: UCL + EPL + La Liga + Serie A + Bundesliga + Ligue 1
 const KEEP_LEAGUE_IDS = new Set([2, 39, 140, 135, 78, 61]);
@@ -23,7 +15,7 @@ const KEEP_LEAGUE_IDS = new Set([2, 39, 140, 135, 78, 61]);
 // =============== PUBLIC ===============
 
 export async function getTodayFixtures(force = false) {
-  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  const date = new Date().toISOString().slice(0, 10);
   const url = `${BASE}/fixtures?date=${date}&timezone=UTC`;
 
   const hit = fixturesCache.get(date);
@@ -35,7 +27,6 @@ export async function getTodayFixtures(force = false) {
   return data;
 }
 
-// Events are fetched on demand (used by the "Details" flow)
 export async function getMatchEvents(matchId, { force = false } = {}) {
   const hit = eventsCache.get(matchId);
   if (!force && hit && Date.now() - hit.ts < EVENTS_TTL_MS) return hit;
@@ -51,44 +42,13 @@ export async function getMatchEvents(matchId, { force = false } = {}) {
 // =============== INTERNAL FETCH ===============
 
 async function fetchJson(url) {
-  // try current key
-  let res = await fetch(url, fetchInit());
-  let json = await tryJson(res);
-
-  // A) Real HTTP 429
-  if (res.status === 429) {
-    rotateKey();
-    res = await fetch(url, fetchInit());
-    json = await tryJson(res);
-  }
-
-  // B) API-FOOTBALL sometimes returns 200 with { errors: {...}, response: [] }
-  if (hasApiFootballError(json)) {
-    rotateKey();
-    const res2 = await fetch(url, fetchInit());
-    const json2 = await tryJson(res2);
-    if (!hasApiFootballError(json2)) return json2;
-    throw new Error(apiFootballErrorMessage(json2) || "API limit reached");
-  }
-
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return json;
+  return tryJson(res);
 }
 
-function fetchInit() {
-  return USE_HEADER_KEY ? { headers: { [HEADER_NAME]: currentKey() } } : undefined;
-}
-function currentKey() { return API_KEYS[keyIndex]; }
-function rotateKey()   {
-  keyIndex = (keyIndex + 1) % API_KEYS.length;
-  // console.log("[soccerApi] switched to key index:", keyIndex);
-}
-
-async function tryJson(res){ try { return await res.json(); } catch { return {}; } }
-function hasApiFootballError(j){ const e=j?.errors; return e && Object.keys(e).length>0; }
-function apiFootballErrorMessage(j){
-  const e=j?.errors; if(!e) return "";
-  return Object.values(e).filter(Boolean).join("; ");
+async function tryJson(res) {
+  try { return await res.json(); } catch { return {}; }
 }
 
 // =============== NORMALIZERS ===============
@@ -109,7 +69,7 @@ function normalizeFixtures(raw) {
         score: num(f.goals?.away),
         logo: str(f.teams?.away?.logo),
       },
-      status: toStatus(f.fixture?.status), // { phase, elapsed, period }
+      status: toStatus(f.fixture?.status),
       kickoffIso: f.fixture?.date ?? null,
       league: f.league?.name ?? "",
     }));
@@ -138,5 +98,6 @@ function toStatus(s = {}) {
   const period = /^1H|HT$/i.test(code) ? 1 : 2;
   return { phase, elapsed, period };
 }
+
 function num(x){ if(typeof x==="number")return x; if(x==null||x==="")return null; const n=Number(x); return Number.isNaN(n)?null:n; }
 function str(x){ return typeof x==="string" && x.length>0 ? x : null; }
