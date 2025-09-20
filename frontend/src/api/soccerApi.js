@@ -3,10 +3,8 @@
 
 const BASE = "https://v3.football.api-sports.io";
 
-// 🔑 keys (in order). Rotates on limit.
 const API_KEYS = [
-  "966cf5e0c0155b46dbe384d1f13569a4",
-  "f455f45a10472840b22e65810565fbcc",
+  "f131abfca7cc5bdcb764a31187cbbe85",
 ];
 let keyIndex = 0;
 

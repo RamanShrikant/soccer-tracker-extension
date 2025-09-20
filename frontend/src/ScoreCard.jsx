@@ -44,7 +44,8 @@ const fmtLocalTime = (iso) =>
     ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : "";
 
-const onlyGoals = (tl = []) => tl.filter((ev) => /GOAL|PEN|OWN/i.test(ev.type || ""));
+const onlyGoals = (tl = []) =>
+  tl.filter((ev) => /GOAL|PEN|OWN/i.test(ev.type || ""));
 
 function TeamScorers({ goals, teamName }) {
   const teamGoals = goals.filter((g) => g.team === teamName);
@@ -65,21 +66,28 @@ function TeamScorers({ goals, teamName }) {
 }
 
 export default function ScoreCard({ match, isFavorite, favTeam }) {
-  const { id, home = {}, away = {}, status = {}, kickoffIso = "", league = "" } =
-    match || {};
+  const {
+    id,
+    home = {},
+    away = {},
+    status = {},
+    kickoffIso = "",
+    league = "",
+    homeId,
+    awayId,
+  } = match || {};
 
   const [timeline, setTimeline] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
-  // NEW: AI state
+  // AI state
   const [aiPreview, setAiPreview] = React.useState("");
   const [aiSummary, setAiSummary] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
 
   let phase = (status.phase || "NS").toUpperCase();
   if (phase === "FINISHED") phase = "FT"; // normalize
-
   const centerTop =
     phase === "IN_PLAY"
       ? status.elapsed != null
@@ -90,15 +98,11 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
       : fmtLocalTime(kickoffIso) || "—";
 
   async function loadDetails() {
-    if (timeline) {
-      setOpen((v) => !v);
-      return;
-    }
     try {
       setLoading(true);
       const { timeline: tl } = await getMatchEvents(id);
       setTimeline(tl || []);
-      setOpen(true);
+      setOpen((v) => !v);
     } finally {
       setLoading(false);
     }
@@ -107,9 +111,23 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   async function fetchAi(endpoint, setter) {
     try {
       setAiLoading(true);
-      const res = await fetch(
-        `https://soccer-tracker-extension.onrender.com/api/ai/${endpoint}/${id}`
-      );
+
+      let url;
+      if (endpoint === "preview") {
+        url = `https://soccer-tracker-extension.onrender.com/api/ai/preview?home=${encodeURIComponent(
+          home.name
+        )}&away=${encodeURIComponent(away.name)}&kickoff=${encodeURIComponent(
+          kickoffIso
+        )}&league=${encodeURIComponent(league)}&homeId=${homeId}&awayId=${awayId}`;
+      } else {
+        url = `https://soccer-tracker-extension.onrender.com/api/ai/summary?matchId=${id}&home=${encodeURIComponent(
+          home.name
+        )}&homeScore=${home.score ?? 0}&away=${encodeURIComponent(
+          away.name
+        )}&awayScore=${away.score ?? 0}`;
+      }
+
+      const res = await fetch(url);
       const text = await res.text();
       setter(text);
     } catch (err) {
@@ -169,7 +187,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
               >
                 {aiLoading ? "Loading…" : "Pre-Match"}
               </button>
-              <div className="mt-1 text-xs text-gray-600 text-center">
+              <div className="mt-1 text-xs text-gray-700 text-center italic max-w-[220px]">
                 {aiPreview}
               </div>
             </>
@@ -185,23 +203,20 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
               >
                 {aiLoading ? "Loading…" : "Post-Match"}
               </button>
-              <div className="mt-1 text-xs text-gray-600 text-center">
+              <div className="mt-1 text-xs text-gray-700 text-center italic max-w-[220px]">
                 {aiSummary}
               </div>
             </>
           )}
 
           {/* Details button */}
-          {!open && phase !== "FT" && (
-            <button
-              onClick={loadDetails}
-              disabled={loading}
-              className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              aria-label="Load match details"
-            >
-              {loading ? "Loading…" : "Details"}
-            </button>
-          )}
+          <button
+            onClick={loadDetails}
+            disabled={loading}
+            className="mt-2 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          >
+            {loading ? "Loading…" : open ? "Hide Details" : "Details"}
+          </button>
         </div>
 
         {/* Away side */}
