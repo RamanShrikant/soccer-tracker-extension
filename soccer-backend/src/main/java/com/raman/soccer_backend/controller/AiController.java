@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/ai")
-@CrossOrigin(origins = "*") // so frontend can call it
+@CrossOrigin(origins = "*")
 public class AiController {
 
     private final AiService aiService;
@@ -14,13 +14,21 @@ public class AiController {
         this.aiService = aiService;
     }
 
-    @GetMapping("/preview/{matchId}")
-    public String getPreMatch(@PathVariable String matchId) {
-        return aiService.getPreMatchAnalysis(matchId);
+    // ✅ Pre-match preview — send team names, kickoff, league
+    @GetMapping("/preview")
+    public String getPreMatch(@RequestParam String home,
+                              @RequestParam String away,
+                              @RequestParam String kickoff,
+                              @RequestParam String league) {
+        return aiService.getPreMatchAnalysis(home, away, kickoff, league);
     }
 
-    @GetMapping("/summary/{matchId}")
-    public String getPostMatch(@PathVariable String matchId) {
-        return aiService.getPostMatchSummary(matchId);
+    // ✅ Post-match recap — send team names + scores
+    @GetMapping("/summary")
+    public String getPostMatch(@RequestParam String home,
+                               @RequestParam int homeScore,
+                               @RequestParam String away,
+                               @RequestParam int awayScore) {
+        return aiService.getPostMatchSummary(home, homeScore, away, awayScore);
     }
 }
