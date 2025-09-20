@@ -25,7 +25,7 @@ public class AiService {
         this.scoresService = scoresService;
     }
 
-    // ✅ Post-match recap using events + result
+    // ✅ Post-match recap
     public String getPostMatchSummary(String matchId, String homeName, int homeScore,
                                       String awayName, int awayScore) {
         List<Map<String, Object>> events = scoresService.getMatchEvents(matchId);
@@ -48,37 +48,34 @@ public class AiService {
         return callOpenAi("Write a 2–4 sentence post-match summary:\n" + facts);
     }
 
-    // ✅ Pre-match preview using form + head-to-head + standings
-    public String getPreMatchSummary(int leagueId, int season,
-                                     int homeId, String homeName,
-                                     int awayId, String awayName) {
+    // ✅ Pre-match analysis (renamed to match AiController)
+    public String getPreMatchAnalysis(int leagueId, int season,
+                                      int homeId, String homeName,
+                                      int awayId, String awayName) {
 
-        // Recent form
         List<String> homeForm = scoresService.getRecentForm(homeId, 5);
         List<String> awayForm = scoresService.getRecentForm(awayId, 5);
 
-        // Head-to-head
         List<Map<String, Object>> h2h = scoresService.getHeadToHead(homeId, awayId, 5);
 
-        // Standings
         Map<String, Object> homeStanding = scoresService.getTeamStanding(leagueId, season, homeId);
         Map<String, Object> awayStanding = scoresService.getTeamStanding(leagueId, season, awayId);
 
         StringBuilder facts = new StringBuilder("Upcoming match: ")
                 .append(homeName).append(" vs ").append(awayName).append(".\n");
 
-        facts.append("Recent form (last 5): ")
+        facts.append("Recent form: ")
                 .append(homeName).append(" -> ").append(String.join("", homeForm))
                 .append(", ").append(awayName).append(" -> ").append(String.join("", awayForm)).append("\n");
 
         if (!h2h.isEmpty()) {
             facts.append("Head-to-head (last ").append(h2h.size()).append(" meetings):\n");
             for (Map<String, Object> m : h2h) {
-                facts.append(m.get("home")).append(" ")
+                facts.append(((Map<?, ?>) m.get("home")).get("name")).append(" ")
                         .append(((Map<?, ?>) m.get("home")).get("score"))
                         .append(" – ")
-                        .append(((Map<?, ?>) m.get("away")).get("score"))
-                        .append(" ").append(((Map<?, ?>) m.get("away")).get("name"))
+                        .append(((Map<?, ?>) m.get("away")).get("score")).append(" ")
+                        .append(((Map<?, ?>) m.get("away")).get("name"))
                         .append(" (").append(m.get("kickoffIso")).append(")\n");
             }
         }
@@ -94,7 +91,7 @@ public class AiService {
         return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts);
     }
 
-    // 🔧 Utility method to call OpenAI
+    // 🔧 Helper
     private String callOpenAi(String prompt) {
         ChatCompletionRequest req = ChatCompletionRequest.builder()
                 .model("gpt-4o-mini")
