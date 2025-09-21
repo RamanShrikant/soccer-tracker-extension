@@ -83,7 +83,9 @@ public class AiService {
             }
         }
 
-        return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts);
+        return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts +
+    "\n⚠️ Always reference the recent head-to-head record if available. " +
+    "Use both recent form and H2H results to suggest which team might have an edge.");
     }
 
     // 🔧 Helper
