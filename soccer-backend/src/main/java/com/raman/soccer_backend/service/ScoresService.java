@@ -24,8 +24,9 @@ public class ScoresService {
 
     // ✅ Fetch all matches for today
 public List<Map<String, Object>> getTodayMatches() {
-    String today = LocalDate.now().plusDays(1).toString(); // force tomorrow
+    String today = LocalDate.now().toString();  // ✅ Correct
     System.out.println("🕒 getTodayMatches() using date = " + today);
+
 
     try {
         JsonNode root = client.get()
