@@ -24,7 +24,7 @@ public class ScoresService {
 
     // ✅ Fetch all matches for today
 public List<Map<String, Object>> getTodayMatches() {
-    String today = LocalDate.now().toString();
+    String today = LocalDate.now().plusDays(1).toString(); // force tomorrow
     System.out.println("🕒 getTodayMatches() using date = " + today);
 
     try {
