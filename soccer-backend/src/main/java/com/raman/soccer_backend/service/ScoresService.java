@@ -12,6 +12,7 @@ import java.util.*;
 public class ScoresService {
 
     private final RestClient client;
+    
 
     public ScoresService(@Value("${apifootball.key:}") String apiKey) {
         System.out.println("🔑 Loaded API key (length): " + (apiKey == null ? "null" : apiKey.length()));
@@ -22,27 +23,29 @@ public class ScoresService {
     }
 
     // ✅ Fetch all matches for today
-    public List<Map<String, Object>> getTodayMatches() {
-        String today = LocalDate.now().toString();
+public List<Map<String, Object>> getTodayMatches() {
+    String today = LocalDate.now().toString();
+    System.out.println("🕒 getTodayMatches() using date = " + today);
 
-        try {
-            JsonNode root = client.get()
-                    .uri("/fixtures?date=" + today + "&timezone=UTC")
-                    .retrieve()
-                    .body(JsonNode.class);
+    try {
+        JsonNode root = client.get()
+                .uri("/fixtures?date=" + today + "&timezone=UTC")
+                .retrieve()
+                .body(JsonNode.class);
 
-            List<Map<String, Object>> matches = new ArrayList<>();
-            for (JsonNode m : root.path("response")) {
-                matches.add(parseMatch(m));
-            }
-            return matches;
-
-        } catch (Exception e) {
-            System.err.println("❌ Error fetching matches: " + e.getMessage());
-            e.printStackTrace();
-            return Collections.emptyList();
+        List<Map<String, Object>> matches = new ArrayList<>();
+        for (JsonNode m : root.path("response")) {
+            matches.add(parseMatch(m));
         }
+        return matches;
+
+    } catch (Exception e) {
+        System.err.println("❌ Error fetching matches: " + e.getMessage());
+        e.printStackTrace();
+        return Collections.emptyList();
     }
+}
+
 
     // ✅ Fetch a single match directly by ID
     public Map<String, Object> getMatchById(String matchId) {
