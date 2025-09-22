@@ -60,6 +60,7 @@ public class AiService {
 
         // Get head-to-head
         List<Map<String, Object>> h2h = scoresService.getHeadToHead(homeId, awayId, 5);
+        System.out.println("📊 H2H for " + homeName + " vs " + awayName + ": " + h2h);
 
         StringBuilder facts = new StringBuilder("Upcoming match: ")
                 .append(homeName).append(" vs ").append(awayName).append(".\n");
