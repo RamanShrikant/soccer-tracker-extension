@@ -39,38 +39,49 @@ public class MatchesController {
 
     // New Odds endpoint ------------------------
     // Example: /api/scores/odds?league=soccer_epl
-    @GetMapping("/odds")
-    public Map<String, Object> getOdds(
-            @RequestParam String league) {
+// New Odds endpoint ------------------------
+// Example: /api/scores/odds?league=soccer_epl
+@GetMapping("/odds")
+public Map<String, Object> getOdds(
+        @RequestParam String league,
+        @RequestParam String home,
+        @RequestParam String away) {
 
-        String url = String.format(
-            "https://api.the-odds-api.com/v4/sports/%s/odds/?regions=eu&markets=h2h&apiKey=%s",
-            league.toLowerCase(),
-            oddsApiKey
-        );
+    String url = String.format(
+        "https://api.the-odds-api.com/v4/sports/%s/odds/?regions=eu&markets=h2h&apiKey=%s",
+        league.toLowerCase(),
+        oddsApiKey
+    );
 
-        RestTemplate restTemplate = new RestTemplate();
-        List<Map<String, Object>> response = restTemplate.getForObject(url, List.class);
+    RestTemplate restTemplate = new RestTemplate();
+    List<Map<String, Object>> response = restTemplate.getForObject(url, List.class);
 
-        Map<String, Object> simplified = new HashMap<>();
-        if (response != null && !response.isEmpty()) {
-            // Just grab first bookmaker to simplify
-            Map<String, Object> firstBook = (Map<String, Object>) response.get(0);
-List<Map<String, Object>> markets = (List<Map<String, Object>>) bookmakers.get(0).get("markets");
-if (markets != null && !markets.isEmpty()) {
-    Map<String, Object> firstMarket = markets.get(0);
-    List<Map<String, Object>> outcomes = (List<Map<String, Object>>) firstMarket.get("outcomes");
-    if (outcomes != null) {
-        for (Map<String, Object> o : outcomes) {
-            String name = (String) o.get("name");
-            Double price = (Double) o.get("price");
-            simplified.put(name, price);
+    if (response == null) return Map.of("error", "No data from Odds API");
+
+    for (Map<String, Object> game : response) {
+        String homeTeam = (String) game.get("home_team");
+        String awayTeam = (String) game.get("away_team");
+
+        if (homeTeam.equalsIgnoreCase(home) && awayTeam.equalsIgnoreCase(away)) {
+            Map<String, Object> simplified = new HashMap<>();
+            List<Map<String, Object>> bookmakers = (List<Map<String, Object>>) game.get("bookmakers");
+            if (bookmakers != null && !bookmakers.isEmpty()) {
+                List<Map<String, Object>> markets = (List<Map<String, Object>>) bookmakers.get(0).get("markets");
+                if (markets != null && !markets.isEmpty()) {
+                    List<Map<String, Object>> outcomes = (List<Map<String, Object>>) markets.get(0).get("outcomes");
+                    if (outcomes != null) {
+                        for (Map<String, Object> o : outcomes) {
+                            simplified.put((String) o.get("name"), o.get("price"));
+                        }
+                    }
+                }
+            }
+            return simplified;
         }
     }
+
+    return Map.of("error", "Match not found in Odds API");
 }
 
-        }
 
-        return simplified;
-    }
 }
