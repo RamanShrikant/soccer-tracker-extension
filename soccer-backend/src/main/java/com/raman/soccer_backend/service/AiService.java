@@ -48,10 +48,11 @@ public class AiService {
         return callOpenAi("Write a 2–4 sentence post-match summary:\n" + facts);
     }
 
-    // ✅ Pre-match analysis — matches controller signature
+    // ✅ Pre-match analysis with odds support
     public String getPreMatchAnalysis(String homeName, String awayName,
                                       String kickoff, String league,
-                                      int homeId, int awayId) {
+                                      int homeId, int awayId,
+                                      String oddsJson) {
 
         // Get recent form
         List<String> homeForm = scoresService.getRecentForm(homeId, 5);
@@ -83,9 +84,21 @@ public class AiService {
             }
         }
 
-        return callOpenAi("Write a 3–5 sentence pre-match preview using this data:\n" + facts +
-    "\n⚠️ Always reference the recent head-to-head record if available. " +
-    "Use both recent form and H2H results to suggest which team might have an edge.");
+        // Odds (sent from frontend)
+        if (oddsJson != null && !oddsJson.isBlank()) {
+            facts.append("Betting odds (raw JSON): ").append(oddsJson).append("\n");
+        }
+
+        return callOpenAi(
+            "You are given structured football data. " +
+            "Write a 3–5 sentence pre-match preview ONLY using this data:\n\n" + facts +
+            "\nRules:\n" +
+            "1. Do NOT invent results, players, or stats that are not listed.\n" +
+            "2. Summarize head-to-head exactly as provided.\n" +
+            "3. Mention betting odds if available, noting which side is the favorite.\n" +
+            "4. Stay concise, neutral, and insightful.\n" +
+            "5. 3–5 sentences maximum."
+        );
     }
 
     // 🔧 Helper

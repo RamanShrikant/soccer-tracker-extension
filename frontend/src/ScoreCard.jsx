@@ -5,6 +5,15 @@ import { getMatchEvents } from "./api/soccerApi"; // returns events array
 const BADGE_SIZE = "h-16 w-16";
 const CARD_PAD = "p-5";
 
+// Map Football API league names → Odds API keys
+const leagueMap = {
+  "Premier League": "soccer_epl",
+  "Ligue 1": "soccer_france_ligue_one",
+  "Serie A": "soccer_italy_serie_a",
+  "La Liga": "soccer_spain_la_liga",
+  "Bundesliga": "soccer_germany_bundesliga",
+};
+
 const initials = (name = "") =>
   name
     .split(" ")
@@ -83,6 +92,10 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   const [aiSummary, setAiSummary] = React.useState("");
   const [aiLoading, setAiLoading] = React.useState(false);
 
+  // Odds state
+  const [odds, setOdds] = React.useState(null);
+  const [oddsLoading, setOddsLoading] = React.useState(false);
+
   let phase = (status.phase || "NS").toUpperCase();
   if (phase === "FINISHED") phase = "FT"; // normalize
   const centerTop =
@@ -98,7 +111,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
     try {
       setLoading(true);
       const events = await getMatchEvents(id);
-      console.log("🎯 Raw events for match", id, events); // 👈 ADD THIS
+      console.log("🎯 Raw events for match", id, events);
       setTimeline(events || []);
       setOpen((v) => !v);
     } finally {
@@ -142,6 +155,34 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
       setter("⚠️ Failed to load AI response");
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function loadOdds() {
+    if (odds) {
+      setOdds(null); // toggle hide if already showing
+      return;
+    }
+
+    setOddsLoading(true);
+    try {
+      const mappedLeague =
+        leagueMap[league] || league.toLowerCase().replace(/\s+/g, "_");
+      const url =
+        `https://soccer-tracker-extension.onrender.com/api/scores/odds` +
+        `?league=${encodeURIComponent(mappedLeague)}` +
+        `&home=${encodeURIComponent(home.name || "")}` +
+        `&away=${encodeURIComponent(away.name || "")}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+      console.log("🎲 Odds response", data);
+      setOdds(data);
+    } catch (err) {
+      console.error("⚠️ Failed to load odds", err);
+      setOdds({ error: "Failed to fetch odds" });
+    } finally {
+      setOddsLoading(false);
     }
   }
 
@@ -213,6 +254,60 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           >
             {loading ? "Loading…" : open ? "Hide Details" : "Details"}
           </button>
+
+          {/* Odds button */}
+          <button
+            onClick={loadOdds}
+            disabled={oddsLoading}
+            className="mt-2 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          >
+            {oddsLoading ? "Loading…" : odds ? "Hide Odds" : "Show Odds"}
+          </button>
+
+          {/* Odds display */}
+{/* Odds display */}
+{odds && !odds.error && (() => {
+  // Step 1: calculate implied probabilities
+  const implied = Object.entries(odds).map(([team, price]) => ({
+    team,
+    price,
+    prob: 1 / price,
+  }));
+
+  // Step 2: normalize so total = 100%
+  const totalProb = implied.reduce((sum, o) => sum + o.prob, 0);
+  const normalized = implied.map(o => ({
+    ...o,
+    pct: (o.prob / totalProb) * 100,
+  }));
+
+  // Step 3: find the favorite (highest %)
+  const maxPct = Math.max(...normalized.map(o => o.pct));
+
+  // Step 4: render
+  return (
+    <div className="mt-2 text-xs text-gray-700 text-center space-y-1">
+      {normalized.map(({ team, price, pct }) => {
+        const isFavorite = pct === maxPct;
+        return (
+          <div
+            key={team}
+            className={isFavorite ? "font-bold text-yellow-600" : ""}
+          >
+            {team}: <span className="font-medium">{price}</span>{" "}
+            <span className="text-gray-500">
+              ({pct.toFixed(1)}%)
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+})()}
+
+          {odds && odds.error && (
+            <div className="mt-2 text-xs text-red-500 text-center">{odds.error}</div>
+          )}
         </div>
 
         {/* Away side */}
@@ -229,13 +324,12 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
         </div>
       </div>
 
-      {/* AI text spans full width */}
+      {/* AI text */}
       {aiPreview && (
         <div className="mt-3 text-sm text-gray-700 text-center italic max-w-[600px] mx-auto whitespace-pre-line leading-relaxed px-4">
           {aiPreview}
         </div>
       )}
-
       {aiSummary && (
         <div className="mt-3 text-sm text-gray-700 text-center italic max-w-[600px] mx-auto whitespace-pre-line leading-relaxed px-4">
           {aiSummary}

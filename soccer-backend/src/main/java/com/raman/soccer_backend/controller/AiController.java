@@ -16,13 +16,14 @@ public class AiController {
 
     // ✅ Pre-match preview
     @GetMapping("/preview")
-    public String getPreMatch(@RequestParam String home,
-                              @RequestParam String away,
-                              @RequestParam String kickoff,
-                              @RequestParam String league,
-                              @RequestParam int homeId,
-                              @RequestParam int awayId) {
-        return aiService.getPreMatchAnalysis(home, away, kickoff, league, homeId, awayId);
+    public String preview(@RequestParam String home,
+                          @RequestParam String away,
+                          @RequestParam String kickoff,
+                          @RequestParam String league,
+                          @RequestParam int homeId,
+                          @RequestParam int awayId,
+                          @RequestParam(required = false) String odds) {
+        return aiService.getPreMatchAnalysis(home, away, kickoff, league, homeId, awayId, odds);
     }
 
     // ✅ Post-match recap
