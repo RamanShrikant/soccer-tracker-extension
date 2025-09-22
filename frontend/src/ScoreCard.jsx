@@ -1,6 +1,6 @@
 // frontend/src/ScoreCard.jsx
 import React from "react";
-import { getMatchEvents } from "./api/soccerApi"; // returns { timeline }
+import { getMatchEvents } from "./api/soccerApi"; // returns events array
 
 const BADGE_SIZE = "h-16 w-16";
 const CARD_PAD = "p-5";
@@ -44,23 +44,20 @@ const fmtLocalTime = (iso) =>
     ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : "";
 
-const onlyGoals = (tl = []) =>
-  tl.filter((ev) => /GOAL|PEN|OWN/i.test(ev.type || ""));
-
-function TeamScorers({ goals, teamName }) {
-  const teamGoals = goals.filter((g) => g.team === teamName);
-  if (!teamGoals.length) return null;
+// Render events under each team
+function TeamEvents({ events, teamName }) {
+  const teamEvents = events.filter((e) => e.team === teamName);
+  if (!teamEvents.length) return null;
 
   return (
-    <div className="text-xs text-gray-600 text-center leading-tight mt-1">
-      {teamGoals
-        .map(
-          (g) =>
-            `${g.player || "Unknown"} ${g.minute ?? 0}${
-              g.extra ? `+${g.extra}` : ""
-            }′`
-        )
-        .join(", ")}
+    <div className="text-xs text-gray-600 text-center leading-tight mt-1 space-y-0.5">
+      {teamEvents.map((ev, i) => (
+        <div key={i}>
+          {ev.minute}
+          {ev.extra ? `+${ev.extra}` : ""}′ –{" "}
+          {ev.player || "Unknown"} {ev.type} {ev.detail}
+        </div>
+      ))}
     </div>
   );
 }
@@ -77,7 +74,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
     awayId,
   } = match || {};
 
-  const [timeline, setTimeline] = React.useState(null);
+  const [timeline, setTimeline] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
@@ -100,31 +97,42 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   async function loadDetails() {
     try {
       setLoading(true);
-      const { timeline: tl } = await getMatchEvents(id);
-      setTimeline(tl || []);
+      const events = await getMatchEvents(id);
+      console.log("🎯 Raw events for match", id, events); // 👈 ADD THIS
+      setTimeline(events || []);
       setOpen((v) => !v);
     } finally {
       setLoading(false);
     }
   }
 
-  async function fetchAi(endpoint, setter) {
+  async function fetchAi(endpoint, setter, current) {
+    if (current) {
+      setter("");
+      return;
+    }
+
     try {
       setAiLoading(true);
 
       let url;
       if (endpoint === "preview") {
-        url = `https://soccer-tracker-extension.onrender.com/api/ai/preview?home=${encodeURIComponent(
-          home.name
-        )}&away=${encodeURIComponent(away.name)}&kickoff=${encodeURIComponent(
-          kickoffIso
-        )}&league=${encodeURIComponent(league)}&homeId=${homeId}&awayId=${awayId}`;
+        url =
+          `https://soccer-tracker-extension.onrender.com/api/ai/preview` +
+          `?home=${encodeURIComponent(home.name || "")}` +
+          `&away=${encodeURIComponent(away.name || "")}` +
+          `&kickoff=${encodeURIComponent(kickoffIso || "")}` +
+          `&league=${encodeURIComponent(league || "")}` +
+          `&homeId=${homeId ?? 0}` +
+          `&awayId=${awayId ?? 0}`;
       } else {
-        url = `https://soccer-tracker-extension.onrender.com/api/ai/summary?matchId=${id}&home=${encodeURIComponent(
-          home.name
-        )}&homeScore=${home.score ?? 0}&away=${encodeURIComponent(
-          away.name
-        )}&awayScore=${away.score ?? 0}`;
+        url =
+          `https://soccer-tracker-extension.onrender.com/api/ai/summary` +
+          `?matchId=${id}` +
+          `&home=${encodeURIComponent(home.name || "")}` +
+          `&homeScore=${home.score ?? 0}` +
+          `&away=${encodeURIComponent(away.name || "")}` +
+          `&awayScore=${away.score ?? 0}`;
       }
 
       const res = await fetch(url);
@@ -136,8 +144,6 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
       setAiLoading(false);
     }
   }
-
-  const goals = onlyGoals(timeline || []);
 
   return (
     <div
@@ -167,11 +173,11 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {home.name || "Home"}
           </div>
-          {open && <TeamScorers goals={goals} teamName={home.name} />}
+          {open && <TeamEvents events={timeline} teamName={home.name} />}
         </div>
 
         {/* Center */}
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-1 col-span-1 w-full">
           <div className="text-lg font-medium text-gray-900">{centerTop}</div>
           <div className="text-2xl font-normal tabular-nums">
             {home.score ?? 0}–{away.score ?? 0}
@@ -179,34 +185,24 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
 
           {/* Pre-Match button */}
           {phase === "NS" && (
-            <>
-              <button
-                onClick={() => fetchAi("preview", setAiPreview)}
-                className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                disabled={aiLoading}
-              >
-                {aiLoading ? "Loading…" : "Pre-Match"}
-              </button>
-              <div className="mt-1 text-xs text-gray-700 text-center italic max-w-[220px]">
-                {aiPreview}
-              </div>
-            </>
+            <button
+              onClick={() => fetchAi("preview", setAiPreview, aiPreview)}
+              className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              disabled={aiLoading}
+            >
+              {aiLoading ? "Loading…" : aiPreview ? "Hide Pre-Match" : "Pre-Match"}
+            </button>
           )}
 
           {/* Post-Match button */}
           {phase === "FT" && (
-            <>
-              <button
-                onClick={() => fetchAi("summary", setAiSummary)}
-                className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                disabled={aiLoading}
-              >
-                {aiLoading ? "Loading…" : "Post-Match"}
-              </button>
-              <div className="mt-1 text-xs text-gray-700 text-center italic max-w-[220px]">
-                {aiSummary}
-              </div>
-            </>
+            <button
+              onClick={() => fetchAi("summary", setAiSummary, aiSummary)}
+              className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              disabled={aiLoading}
+            >
+              {aiLoading ? "Loading…" : aiSummary ? "Hide Post-Match" : "Post-Match"}
+            </button>
           )}
 
           {/* Details button */}
@@ -229,9 +225,22 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {away.name || "Away"}
           </div>
-          {open && <TeamScorers goals={goals} teamName={away.name} />}
+          {open && <TeamEvents events={timeline} teamName={away.name} />}
         </div>
       </div>
+
+      {/* AI text spans full width */}
+      {aiPreview && (
+        <div className="mt-3 text-sm text-gray-700 text-center italic max-w-[600px] mx-auto whitespace-pre-line leading-relaxed px-4">
+          {aiPreview}
+        </div>
+      )}
+
+      {aiSummary && (
+        <div className="mt-3 text-sm text-gray-700 text-center italic max-w-[600px] mx-auto whitespace-pre-line leading-relaxed px-4">
+          {aiSummary}
+        </div>
+      )}
     </div>
   );
 }

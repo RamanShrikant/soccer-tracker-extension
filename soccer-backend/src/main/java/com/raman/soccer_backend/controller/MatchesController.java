@@ -56,20 +56,19 @@ public class MatchesController {
         if (response != null && !response.isEmpty()) {
             // Just grab first bookmaker to simplify
             Map<String, Object> firstBook = (Map<String, Object>) response.get(0);
-            List<Map<String, Object>> bookmakers = (List<Map<String, Object>>) firstBook.get("bookmakers");
-            if (bookmakers != null && !bookmakers.isEmpty()) {
-                Map<String, Object> firstMarket = (Map<String, Object>) bookmakers.get(0).get("markets");
-                if (firstMarket != null) {
-                    List<Map<String, Object>> outcomes = (List<Map<String, Object>>) firstMarket.get("outcomes");
-                    if (outcomes != null) {
-                        for (Map<String, Object> o : outcomes) {
-                            String name = (String) o.get("name");
-                            Double price = (Double) o.get("price");
-                            simplified.put(name, price);
-                        }
-                    }
-                }
-            }
+List<Map<String, Object>> markets = (List<Map<String, Object>>) bookmakers.get(0).get("markets");
+if (markets != null && !markets.isEmpty()) {
+    Map<String, Object> firstMarket = markets.get(0);
+    List<Map<String, Object>> outcomes = (List<Map<String, Object>>) firstMarket.get("outcomes");
+    if (outcomes != null) {
+        for (Map<String, Object> o : outcomes) {
+            String name = (String) o.get("name");
+            Double price = (Double) o.get("price");
+            simplified.put(name, price);
+        }
+    }
+}
+
         }
 
         return simplified;

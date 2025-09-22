@@ -5,12 +5,47 @@ const BASE = "https://soccer-tracker-extension.onrender.com/api/scores";
 
 // --- caches (2 minutes) ---
 const FIXTURE_TTL_MS = 2 * 60 * 1000;
-const EVENTS_TTL_MS  = 2 * 60 * 1000;
+const EVENTS_TTL_MS = 2 * 60 * 1000;
 const fixturesCache = new Map();
-const eventsCache   = new Map();
+const eventsCache = new Map();
 
 // Keep only: UCL + EPL + La Liga + Serie A + Bundesliga + Ligue 1
 const KEEP_LEAGUE_IDS = new Set([2, 39, 140, 135, 78, 61]);
+
+// =============== HELPERS ===============
+
+function num(x) {
+  if (typeof x === "number") return x;
+  if (x == null || x === "") return null;
+  const n = Number(x);
+  return Number.isNaN(n) ? null : n;
+}
+
+function str(x) {
+  return typeof x === "string" && x.length > 0 ? x : null;
+}
+
+function toStatus(s = {}) {
+  const code = (s.short ?? s.code ?? s.phase ?? s.state ?? s.status ?? "NS").toString();
+  const elapsed = num(s.elapsed ?? s.minute ?? s.time ?? 0);
+
+  console.log("🔍 toStatus input:", s, "-> parsed code:", code);
+
+  const inPlay = /^(1H|2H|ET|P|LIVE)$/i.test(code);
+  const paused = /^HT$/i.test(code);
+  const finished = /^(FT|AET|PEN|CANC|ABD|PST|FT_PEN|FINISHED|MATCH_FINISHED)$/i.test(code);
+
+  const phase = inPlay
+    ? "IN_PLAY"
+    : paused
+    ? "PAUSED"
+    : finished
+    ? "FINISHED"
+    : code.toUpperCase();
+
+  const period = /^1H|HT$/i.test(code) ? 1 : 2;
+  return { phase, elapsed, period };
+}
 
 // =============== PUBLIC ===============
 
@@ -21,7 +56,7 @@ export async function getTodayFixtures(force = false) {
   const hit = fixturesCache.get(date);
   if (!force && hit && Date.now() - hit.ts < FIXTURE_TTL_MS) return hit.data;
 
-  const json = await fetchJson(url);  
+  const json = await fetchJson(url);
   const data = normalizeFixtures(json);
   fixturesCache.set(date, { data, ts: Date.now() });
   return data;
@@ -29,14 +64,13 @@ export async function getTodayFixtures(force = false) {
 
 export async function getMatchEvents(matchId, { force = false } = {}) {
   const hit = eventsCache.get(matchId);
-  if (!force && hit && Date.now() - hit.ts < EVENTS_TTL_MS) return hit;
+  if (!force && hit && Date.now() - hit.ts < EVENTS_TTL_MS) return hit.timeline;
 
   const url = `${BASE}/fixtures/events?fixture=${matchId}`;
   const evJson = await fetchJson(url);
   const timeline = normalizeEventsOnly(evJson);
-  const data = { timeline, ts: Date.now() };
-  eventsCache.set(matchId, data);
-  return data;
+  eventsCache.set(matchId, { timeline, ts: Date.now() });
+  return timeline; // return array only ✅
 }
 
 // =============== INTERNAL FETCH ===============
@@ -48,30 +82,29 @@ async function fetchJson(url) {
 }
 
 async function tryJson(res) {
-  try { return await res.json(); } catch { return {}; }
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
 }
 
 // =============== NORMALIZERS ===============
 
 function normalizeFixtures(raw) {
-  const arr = Array.isArray(raw?.response) ? raw.response : [];
+  console.log("⚽ Raw fixtures from backend:", raw);
+
+  const arr = Array.isArray(raw) ? raw : [];
   return arr
-    .filter(f => KEEP_LEAGUE_IDS.has(f.league?.id))
+    .filter((f) => KEEP_LEAGUE_IDS.has(f.leagueId)) // backend already provides leagueId
     .map((f) => ({
-      id: f.fixture?.id,
-      home: {
-        name: f.teams?.home?.name ?? "",
-        score: num(f.goals?.home),
-        logo: str(f.teams?.home?.logo),
-      },
-      away: {
-        name: f.teams?.away?.name ?? "",
-        score: num(f.goals?.away),
-        logo: str(f.teams?.away?.logo),
-      },
-      status: toStatus(f.fixture?.status),
-      kickoffIso: f.fixture?.date ?? null,
-      league: f.league?.name ?? "",
+      id: f.id,
+      home: f.home,
+      away: f.away,
+      status: toStatus(f.status), // ✅ patched
+      kickoffIso: f.kickoffIso,
+      league: f.league,
+      leagueId: f.leagueId,
     }));
 }
 
@@ -83,21 +116,6 @@ function normalizeEventsOnly(eventsRaw) {
     type: ev.type ?? ev.detail ?? ev.event ?? "",
     player: ev.player?.name ?? ev.player_name ?? "",
     team: ev.team?.name ?? ev.team_name ?? "",
+    detail: ev.detail ?? "", // keep extra info like Yellow Card, Substitution etc
   }));
 }
-
-// =============== HELPERS ===============
-
-function toStatus(s = {}) {
-  const code = (s.short ?? s.code ?? s.phase ?? s.state ?? s.status ?? "NS").toString();
-  const elapsed = num(s.elapsed ?? s.minute ?? s.time ?? 0);
-  const inPlay = /^(1H|2H|ET|P|LIVE)$/i.test(code);
-  const paused = /^HT$/i.test(code);
-  const finished = /^(FT|AET|PEN|CANC|ABD|PST|FT_PEN)$/i.test(code);
-  const phase = inPlay ? "IN_PLAY" : paused ? "PAUSED" : finished ? "FINISHED" : code.toUpperCase();
-  const period = /^1H|HT$/i.test(code) ? 1 : 2;
-  return { phase, elapsed, period };
-}
-
-function num(x){ if(typeof x==="number")return x; if(x==null||x==="")return null; const n=Number(x); return Number.isNaN(n)?null:n; }
-function str(x){ return typeof x==="string" && x.length>0 ? x : null; }
