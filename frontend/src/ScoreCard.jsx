@@ -53,10 +53,45 @@ const fmtLocalTime = (iso) =>
     ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : "";
 
-// Render events under each team
-function TeamEvents({ events, teamName }) {
-  const teamEvents = events.filter((e) => e.team === teamName);
-  if (!teamEvents.length) return null;
+// =============== TEAM EVENTS ===============
+function TeamEvents({ events, teamName, teamId }) {
+  console.log("📝 Rendering TeamEvents:", { teamName, teamId, events });
+
+  const teamEvents = events.filter((e) => {
+    if (teamId && e.teamId) return e.teamId === teamId;
+    if (!teamName || !e.team) return false;
+    return (
+      e.team.toLowerCase() === teamName.toLowerCase() ||
+      e.team.toLowerCase().includes(teamName.toLowerCase()) ||
+      teamName.toLowerCase().includes(e.team.toLowerCase())
+    );
+  });
+
+  console.log("✅ Filtered events for", teamName, teamEvents);
+
+  if (!teamEvents.length)
+    return <div className="text-xs text-gray-400">No events</div>;
+
+  const formatEvent = (ev) => {
+    if (/goal/i.test(ev.type)) {
+      return `⚽ **${ev.player || "Unknown"}** ${
+        ev.detail && ev.detail !== "Normal Goal" ? `(${ev.detail})` : ""
+      }`;
+    }
+    if (/pen/i.test(ev.detail)) {
+      return `⚽ **${ev.player || "Unknown"}** (Penalty)`;
+    }
+    if (/yellow/i.test(ev.type) || /yellow/i.test(ev.detail)) {
+      return `🟨 ${ev.player || "Unknown"}`;
+    }
+    if (/red/i.test(ev.type) || /red/i.test(ev.detail)) {
+      return `🟥 ${ev.player || "Unknown"}`;
+    }
+    if (/sub/i.test(ev.type) || /subst/i.test(ev.detail)) {
+      return `🔄 ${ev.player || "Unknown"}`;
+    }
+    return `${ev.player || "Unknown"} ${ev.type} ${ev.detail}`;
+  };
 
   return (
     <div className="text-xs text-gray-600 text-center leading-tight mt-1 space-y-0.5">
@@ -64,13 +99,18 @@ function TeamEvents({ events, teamName }) {
         <div key={i}>
           {ev.minute}
           {ev.extra ? `+${ev.extra}` : ""}′ –{" "}
-          {ev.player || "Unknown"} {ev.type} {ev.detail}
+          <span
+            className={/goal/i.test(ev.type) ? "font-bold text-black" : ""}
+            dangerouslySetInnerHTML={{ __html: formatEvent(ev) }}
+          />
         </div>
       ))}
     </div>
   );
 }
 
+
+// =============== SCORECARD ===============
 export default function ScoreCard({ match, isFavorite, favTeam }) {
   const {
     id,
@@ -79,8 +119,6 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
     status = {},
     kickoffIso = "",
     league = "",
-    homeId,
-    awayId,
   } = match || {};
 
   const [timeline, setTimeline] = React.useState([]);
@@ -96,14 +134,28 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   const [odds, setOdds] = React.useState(null);
   const [oddsLoading, setOddsLoading] = React.useState(false);
 
-  let phase = (status.phase || "NS").toUpperCase();
-  if (phase === "FINISHED") phase = "FT"; // normalize
+  // Normalize phase → human-friendly labels
+  let rawPhase = (status.phase || "NS").toUpperCase();
+  let phase = "";
+
+  if (rawPhase === "NS") {
+    phase = "Scheduled";
+  } else if (rawPhase === "IN_PLAY") {
+    phase = "Live";
+  } else if (rawPhase === "PAUSED") {
+    phase = "Halftime";
+  } else if (rawPhase === "FINISHED") {
+    phase = "Finished";
+  } else {
+    phase = rawPhase; // fallback
+  }
+
   const centerTop =
-    phase === "IN_PLAY"
+    rawPhase === "IN_PLAY"
       ? status.elapsed != null
         ? `${status.elapsed}′`
         : "LIVE"
-      : phase === "PAUSED"
+      : rawPhase === "PAUSED"
       ? "HT"
       : fmtLocalTime(kickoffIso) || "—";
 
@@ -119,44 +171,56 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
     }
   }
 
-  async function fetchAi(endpoint, setter, current) {
-    if (current) {
-      setter("");
-      return;
-    }
+// inside ScoreCard.jsx, in fetchAi()
 
-    try {
-      setAiLoading(true);
-
-      let url;
-      if (endpoint === "preview") {
-        url =
-          `https://soccer-tracker-extension.onrender.com/api/ai/preview` +
-          `?home=${encodeURIComponent(home.name || "")}` +
-          `&away=${encodeURIComponent(away.name || "")}` +
-          `&kickoff=${encodeURIComponent(kickoffIso || "")}` +
-          `&league=${encodeURIComponent(league || "")}` +
-          `&homeId=${homeId ?? 0}` +
-          `&awayId=${awayId ?? 0}`;
-      } else {
-        url =
-          `https://soccer-tracker-extension.onrender.com/api/ai/summary` +
-          `?matchId=${id}` +
-          `&home=${encodeURIComponent(home.name || "")}` +
-          `&homeScore=${home.score ?? 0}` +
-          `&away=${encodeURIComponent(away.name || "")}` +
-          `&awayScore=${away.score ?? 0}`;
-      }
-
-      const res = await fetch(url);
-      const text = await res.text();
-      setter(text);
-    } catch (err) {
-      setter("⚠️ Failed to load AI response");
-    } finally {
-      setAiLoading(false);
-    }
+async function fetchAi(endpoint, setter, current) {
+  if (current) {
+    setter(""); // toggle off
+    return;
   }
+
+  try {
+    setAiLoading(true);
+
+    let url;
+    if (endpoint === "preview") {
+      url =
+        `https://soccer-tracker-extension.onrender.com/api/ai/preview` +
+        `?home=${encodeURIComponent(home.name || "")}` +
+        `&away=${encodeURIComponent(away.name || "")}` +
+        `&kickoff=${encodeURIComponent(kickoffIso || "")}` +
+        `&league=${encodeURIComponent(leagueMap[league] || league)}` +
+        `&homeId=${home.id || 0}` +
+        `&awayId=${away.id || 0}`;
+    } else {
+      url =
+        `https://soccer-tracker-extension.onrender.com/api/ai/summary` +
+        `?matchId=${id}` +
+        `&home=${encodeURIComponent(home.name || "")}` +
+        `&homeScore=${home.score ?? 0}` +
+        `&away=${encodeURIComponent(away.name || "")}` +
+        `&awayScore=${away.score ?? 0}`;
+    }
+
+    console.log("🤖 AI fetch URL:", url);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    console.log("📝 AI response text:", text);
+
+    setter(text);
+  } catch (err) {
+    console.error("⚠️ AI fetch failed", err);
+    setter("⚠️ Failed to load AI response");
+  } finally {
+    setAiLoading(false);
+  }
+}
+
+
+
+
 
   async function loadOdds() {
     if (odds) {
@@ -214,7 +278,13 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {home.name || "Home"}
           </div>
-          {open && <TeamEvents events={timeline} teamName={home.name} />}
+          {open && (
+            <TeamEvents
+              events={timeline}
+              teamName={home.name}
+              teamId={home.id}
+            />
+          )}
         </div>
 
         {/* Center */}
@@ -225,7 +295,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           </div>
 
           {/* Pre-Match button */}
-          {phase === "NS" && (
+          {phase === "Scheduled" && (
             <button
               onClick={() => fetchAi("preview", setAiPreview, aiPreview)}
               className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
@@ -236,7 +306,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           )}
 
           {/* Post-Match button */}
-          {phase === "FT" && (
+          {phase === "Finished" && (
             <button
               onClick={() => fetchAi("summary", setAiSummary, aiSummary)}
               className="mt-1 rounded-xl border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
@@ -265,45 +335,40 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           </button>
 
           {/* Odds display */}
-{/* Odds display */}
-{odds && !odds.error && (() => {
-  // Step 1: calculate implied probabilities
-  const implied = Object.entries(odds).map(([team, price]) => ({
-    team,
-    price,
-    prob: 1 / price,
-  }));
+          {odds && !odds.error && (() => {
+            const implied = Object.entries(odds).map(([team, price]) => ({
+              team,
+              price,
+              prob: 1 / price,
+            }));
 
-  // Step 2: normalize so total = 100%
-  const totalProb = implied.reduce((sum, o) => sum + o.prob, 0);
-  const normalized = implied.map(o => ({
-    ...o,
-    pct: (o.prob / totalProb) * 100,
-  }));
+            const totalProb = implied.reduce((sum, o) => sum + o.prob, 0);
+            const normalized = implied.map(o => ({
+              ...o,
+              pct: (o.prob / totalProb) * 100,
+            }));
 
-  // Step 3: find the favorite (highest %)
-  const maxPct = Math.max(...normalized.map(o => o.pct));
+            const maxPct = Math.max(...normalized.map(o => o.pct));
 
-  // Step 4: render
-  return (
-    <div className="mt-2 text-xs text-gray-700 text-center space-y-1">
-      {normalized.map(({ team, price, pct }) => {
-        const isFavorite = pct === maxPct;
-        return (
-          <div
-            key={team}
-            className={isFavorite ? "font-bold text-yellow-600" : ""}
-          >
-            {team}: <span className="font-medium">{price}</span>{" "}
-            <span className="text-gray-500">
-              ({pct.toFixed(1)}%)
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-})()}
+            return (
+              <div className="mt-2 text-xs text-gray-700 text-center space-y-1">
+                {normalized.map(({ team, price, pct }) => {
+                  const isFav = pct === maxPct;
+                  return (
+                    <div
+                      key={team}
+                      className={isFav ? "font-bold text-yellow-600" : ""}
+                    >
+                      {team}: <span className="font-medium">{price}</span>{" "}
+                      <span className="text-gray-500">
+                        ({pct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {odds && odds.error && (
             <div className="mt-2 text-xs text-red-500 text-center">{odds.error}</div>
@@ -320,7 +385,13 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
           <div className="text-sm font-bold text-gray-900 text-center leading-tight">
             {away.name || "Away"}
           </div>
-          {open && <TeamEvents events={timeline} teamName={away.name} />}
+          {open && (
+            <TeamEvents
+              events={timeline}
+              teamName={away.name}
+              teamId={away.id}
+            />
+          )}
         </div>
       </div>
 
