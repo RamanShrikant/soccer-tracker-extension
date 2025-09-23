@@ -97,7 +97,7 @@ public class AiService {
             "1. Do NOT invent results, players, or stats that are not listed.\n" +
             "2. Summarize head-to-head exactly as provided.\n" +
             "3. Mention betting odds if available, noting which side is the favorite.\n" +
-            "4. Stay concise, neutral, and insightful.\n" +
+            "4. Try to stay concise, neutral, and insightful but if a team has a lot of odds to win, like over 50 percent, favour them to win in your summary.\n" +
             "5. 3–5 sentences maximum."
         );
     }
