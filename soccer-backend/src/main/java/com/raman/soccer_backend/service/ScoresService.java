@@ -96,38 +96,102 @@ public List<Map<String, Object>> getTodayMatches() {
             return Collections.emptyList();
         }
     }
+    // Odds API integration
+public List<Map<String, Object>> getOdds(String league) {
+    String apiKey = "95ff0c69ac2576ece2cd9683806a6225"; // dummy key for now
+    String url = "https://api.the-odds-api.com/v4/sports/" 
+                 + league 
+                 + "/odds/?regions=us&markets=h2h&apiKey=" 
+                 + apiKey;
+
+    try {
+        RestClient oddsClient = RestClient.create();
+        JsonNode root = oddsClient.get()
+                .uri(url)
+                .retrieve()
+                .body(JsonNode.class);
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (root.isArray()) {
+            for (JsonNode game : root) {
+                Map<String, Object> matchOdds = new HashMap<>();
+                matchOdds.put("id", game.path("id").asText());
+                matchOdds.put("sport", game.path("sport_key").asText());
+                matchOdds.put("home_team", game.path("home_team").asText());
+                matchOdds.put("away_team", game.path("away_team").asText());
+
+                // Grab first bookmaker’s odds if available
+                JsonNode bookmaker = game.path("bookmakers").isArray() && game.path("bookmakers").size() > 0
+                        ? game.path("bookmakers").get(0)
+                        : null;
+                if (bookmaker != null) {
+                    JsonNode markets = bookmaker.path("markets").get(0).path("outcomes");
+                    List<Map<String, Object>> oddsList = new ArrayList<>();
+                    for (JsonNode outcome : markets) {
+                        Map<String, Object> o = new HashMap<>();
+                        o.put("name", outcome.path("name").asText());
+                        o.put("price", outcome.path("price").asDouble());
+                        oddsList.add(o);
+                    }
+                    matchOdds.put("odds", oddsList);
+                }
+
+                results.add(matchOdds);
+            }
+        }
+
+        return results;
+
+    } catch (Exception e) {
+        System.err.println("❌ Error fetching odds: " + e.getMessage());
+        e.printStackTrace();
+        return Collections.emptyList();
+    }
+}
+
 
     // ✅ Helper to parse one match JSON into a Map
-    private Map<String, Object> parseMatch(JsonNode m) {
-        Map<String, Object> match = new HashMap<>();
-        match.put("id", m.path("fixture").path("id").asText());
-        match.put("league", m.path("league").path("name").asText());
-        match.put("kickoffIso", m.path("fixture").path("date").asText());
+// ✅ Helper to parse one match JSON into a Map
+private Map<String, Object> parseMatch(JsonNode m) {
+    Map<String, Object> match = new HashMap<>();
+    match.put("id", m.path("fixture").path("id").asText());
+    match.put("league", m.path("league").path("name").asText());
+    match.put("kickoffIso", m.path("fixture").path("date").asText());
 
-        match.put("leagueId", m.path("league").path("id").asInt());
-        match.put("season", m.path("league").path("season").asInt());
-        match.put("homeId", m.path("teams").path("home").path("id").asInt());
-        match.put("awayId", m.path("teams").path("away").path("id").asInt());
+    match.put("leagueId", m.path("league").path("id").asInt());
+    match.put("season", m.path("league").path("season").asInt());
+    match.put("homeId", m.path("teams").path("home").path("id").asInt());
+    match.put("awayId", m.path("teams").path("away").path("id").asInt());
 
-        Map<String, Object> home = new HashMap<>();
-        home.put("name", m.path("teams").path("home").path("name").asText());
-        home.put("logo", m.path("teams").path("home").path("logo").asText(null));
-        home.put("score", m.path("goals").path("home").isInt()
-                ? m.path("goals").path("home").asInt()
-                : null);
+    Map<String, Object> home = new HashMap<>();
+    home.put("name", m.path("teams").path("home").path("name").asText());
+    home.put("logo", m.path("teams").path("home").path("logo").asText(null));
+    home.put("score", m.path("goals").path("home").isInt()
+            ? m.path("goals").path("home").asInt()
+            : null);
 
-        Map<String, Object> away = new HashMap<>();
-        away.put("name", m.path("teams").path("away").path("name").asText());
-        away.put("logo", m.path("teams").path("away").path("logo").asText(null));
-        away.put("score", m.path("goals").path("away").isInt()
-                ? m.path("goals").path("away").asInt()
-                : null);
+    Map<String, Object> away = new HashMap<>();
+    away.put("name", m.path("teams").path("away").path("name").asText());
+    away.put("logo", m.path("teams").path("away").path("logo").asText(null));
+    away.put("score", m.path("goals").path("away").isInt()
+            ? m.path("goals").path("away").asInt()
+            : null);
 
-        match.put("home", home);
-        match.put("away", away);
+    match.put("home", home);
+    match.put("away", away);
 
-        return match;
-    }
+    // ✅ NEW: add status info (phase + elapsed time)
+    Map<String, Object> status = new HashMap<>();
+    status.put("phase", m.path("fixture").path("status").path("short").asText()); // e.g. "1H", "HT", "FT"
+    status.put("long", m.path("fixture").path("status").path("long").asText());   // e.g. "First Half"
+    status.put("elapsed", m.path("fixture").path("status").path("elapsed").isInt()
+            ? m.path("fixture").path("status").path("elapsed").asInt()
+            : null);
+    match.put("status", status);
+
+    return match;
+}
+
 
     // ✅ Get last N matches for a team (recent form)
     public List<String> getRecentForm(int teamId, int lastN) {
