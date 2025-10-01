@@ -118,12 +118,16 @@ private String normalizeTeam(String name) {
     name = name.trim();
 
     Map<String, String> aliases = Map.ofEntries(
-        Map.entry("Athletic Club", "Athletic Bilbao"),
-        Map.entry("PSG", "Paris Saint Germain"),
-        Map.entry("Qarabag", "Qarabag FK"),
-        Map.entry("Man City", "Manchester City"),
-        Map.entry("Inter Milan", "Internazionale"),
-        Map.entry("Sporting", "Sporting Lisbon")
+    Map.entry("Athletic Club", "Athletic Bilbao"),
+    Map.entry("PSG", "Paris Saint Germain"),
+    Map.entry("Qarabag", "Qarabag FK"),
+    Map.entry("Man City", "Manchester City"),
+    Map.entry("Inter Milan", "Internazionale"),
+    Map.entry("Sporting CP", "Sporting Lisbon"),
+    Map.entry("Monaco", "AS Monaco")
+    Map.entry("Newcastle", "Newcastle United"),
+    Map.entry("Union St. Gilloise", "Union Saint-Gilloise")
+
         // add more as needed
     );
 
