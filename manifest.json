@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Soccer Tracker",
-  "version": "0.1.0",
+  "version": "2.1.3",
 
   "action": {
-    "default_popup": "frontend/build/index.html",
+    "default_popup": "index.html",
     "default_title": "Soccer Tracker"
   },
 
@@ -19,9 +19,10 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' https: data: blob:;"
   },
-    "icons": {
-    "16": "frontend/public/icons/icon16.png",
-    "48": "frontend/public/icons/icon48.png",
-    "128": "frontend/public/icons/icon128.png"
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

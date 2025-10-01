@@ -78,6 +78,9 @@ public Map<String, Object> getOdds(
         for (Map<String, Object> game : response) {
             String homeTeam = (String) game.get("home_team");
             String awayTeamResp = (String) game.get("away_team");
+                // DEBUG LOG
+                System.out.println("Looking for: " + home + " vs " + away);
+                System.out.println("Odds API has: " + homeTeam + " vs " + awayTeamResp);
 
             if (homeTeam.equalsIgnoreCase(home) && awayTeamResp.equalsIgnoreCase(away)) {
                 Map<String, Object> simplified = new HashMap<>();

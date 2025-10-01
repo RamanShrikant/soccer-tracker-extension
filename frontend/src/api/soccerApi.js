@@ -104,13 +104,29 @@ function normalizeEventsOnly(eventsRaw) {
 
   console.log("🎯 normalizeEventsOnly input:", eventsRaw, "=> parsed length:", arr.length);
 
-  return arr.map((ev) => ({
-    minute: num(ev.minute ?? ev.time?.elapsed ?? ev.min ?? 0),
-    extra: ev.extra ?? ev.time?.extra ?? null,
-    type: ev.type ?? ev.detail ?? ev.event ?? "",
-    player: ev.player?.name ?? ev.player ?? ev.player_name ?? "Unknown",
-    team: ev.team?.name ?? ev.team ?? ev.team_name ?? "",   // always string
-    teamId: ev.team?.id ?? ev.teamId ?? ev.team_id ?? null,
-    detail: ev.detail ?? "",
-  }));
+  return arr.map((ev) => {
+    let teamName = "";
+    let teamId = null;
+
+    if (typeof ev.team === "string") {
+      teamName = ev.team;
+    } else if (typeof ev.team === "object" && ev.team) {
+      teamName = ev.team.name ?? "";
+      teamId = ev.team.id ?? null;
+    } else {
+      teamName = ev.team_name ?? "";
+      teamId = ev.team_id ?? null;
+    }
+
+    return {
+      minute: num(ev.minute ?? ev.time?.elapsed ?? ev.min ?? 0),
+      extra: ev.extra ?? ev.time?.extra ?? null,
+      type: ev.type ?? ev.detail ?? ev.event ?? "",
+      player: ev.player?.name ?? ev.player ?? ev.player_name ?? "Unknown",
+      team: teamName,
+      teamId,
+      detail: ev.detail ?? "",
+    };
+  });
 }
+

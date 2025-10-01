@@ -54,7 +54,7 @@ const fmtLocalTime = (iso) =>
     : "";
 
 // =============== TEAM EVENTS ===============
-function TeamEvents({ events, teamName, teamId }) {
+function TeamEvents({ events, teamName, teamId, status }) {
   console.log("📝 Rendering TeamEvents:", { teamName, teamId, events });
 
   const teamEvents = events.filter((e) => {
@@ -69,8 +69,22 @@ function TeamEvents({ events, teamName, teamId }) {
 
   console.log("✅ Filtered events for", teamName, teamEvents);
 
-  if (!teamEvents.length)
-    return <div className="text-xs text-gray-400">No events</div>;
+if (!teamEvents.length) {
+  if (status?.phase === "Scheduled") {
+    return <div className="text-xs text-gray-400">Game hasn't started yet</div>;
+  }
+  if (status?.phase === "IN_PLAY") {
+    return (
+      <div className="text-xs text-gray-400">
+        ⏱ {status.elapsed != null ? `${status.elapsed}′` : "LIVE"} — No events yet
+      </div>
+    );
+  }
+  if (status?.phase === "Finished") {
+    return <div className="text-xs text-gray-400">No events recorded</div>;
+  }
+}
+
 
   const formatEvent = (ev) => {
     if (/goal/i.test(ev.type)) {
@@ -109,14 +123,13 @@ function TeamEvents({ events, teamName, teamId }) {
   );
 }
 
-
 // =============== SCORECARD ===============
 export default function ScoreCard({ match, isFavorite, favTeam }) {
   const {
     id,
     home = {},
     away = {},
-    status = {},
+    status: matchStatus = {}, // ✅ renamed here
     kickoffIso = "",
     league = "",
   } = match || {};
@@ -134,8 +147,7 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   const [odds, setOdds] = React.useState(null);
   const [oddsLoading, setOddsLoading] = React.useState(false);
 
-  // Normalize phase → human-friendly labels
-  let rawPhase = (status.phase || "NS").toUpperCase();
+  let rawPhase = (matchStatus.phase || "NS").toUpperCase();
   let phase = "";
 
   if (rawPhase === "NS") {
@@ -147,13 +159,13 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
   } else if (rawPhase === "FINISHED") {
     phase = "Finished";
   } else {
-    phase = rawPhase; // fallback
+    phase = rawPhase;
   }
 
   const centerTop =
     rawPhase === "IN_PLAY"
-      ? status.elapsed != null
-        ? `${status.elapsed}′`
+      ? matchStatus.elapsed != null
+        ? `${matchStatus.elapsed}′`
         : "LIVE"
       : rawPhase === "PAUSED"
       ? "HT"
@@ -171,60 +183,54 @@ export default function ScoreCard({ match, isFavorite, favTeam }) {
     }
   }
 
-// inside ScoreCard.jsx, in fetchAi()
-
-async function fetchAi(endpoint, setter, current) {
-  if (current) {
-    setter(""); // toggle off
-    return;
-  }
-
-  try {
-    setAiLoading(true);
-
-    let url;
-    if (endpoint === "preview") {
-      url =
-        `https://soccer-tracker-extension.onrender.com/api/ai/preview` +
-        `?home=${encodeURIComponent(home.name || "")}` +
-        `&away=${encodeURIComponent(away.name || "")}` +
-        `&kickoff=${encodeURIComponent(kickoffIso || "")}` +
-        `&league=${encodeURIComponent(leagueMap[league] || league)}` +
-        `&homeId=${home.id || 0}` +
-        `&awayId=${away.id || 0}`;
-    } else {
-      url =
-        `https://soccer-tracker-extension.onrender.com/api/ai/summary` +
-        `?matchId=${id}` +
-        `&home=${encodeURIComponent(home.name || "")}` +
-        `&homeScore=${home.score ?? 0}` +
-        `&away=${encodeURIComponent(away.name || "")}` +
-        `&awayScore=${away.score ?? 0}`;
+  async function fetchAi(endpoint, setter, current) {
+    if (current) {
+      setter("");
+      return;
     }
 
-    console.log("🤖 AI fetch URL:", url);
+    try {
+      setAiLoading(true);
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    console.log("📝 AI response text:", text);
+      let url;
+      if (endpoint === "preview") {
+        url =
+          `https://soccer-tracker-extension.onrender.com/api/ai/preview` +
+          `?home=${encodeURIComponent(home.name || "")}` +
+          `&away=${encodeURIComponent(away.name || "")}` +
+          `&kickoff=${encodeURIComponent(kickoffIso || "")}` +
+          `&league=${encodeURIComponent(leagueMap[league] || league)}` +
+          `&homeId=${home.id || 0}` +
+          `&awayId=${away.id || 0}`;
+      } else {
+        url =
+          `https://soccer-tracker-extension.onrender.com/api/ai/summary` +
+          `?matchId=${id}` +
+          `&home=${encodeURIComponent(home.name || "")}` +
+          `&homeScore=${home.score ?? 0}` +
+          `&away=${encodeURIComponent(away.name || "")}` +
+          `&awayScore=${away.score ?? 0}`;
+      }
 
-    setter(text);
-  } catch (err) {
-    console.error("⚠️ AI fetch failed", err);
-    setter("⚠️ Failed to load AI response");
-  } finally {
-    setAiLoading(false);
+      console.log("🤖 AI fetch URL:", url);
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      console.log("📝 AI response text:", text);
+
+      setter(text);
+    } catch (err) {
+      console.error("⚠️ AI fetch failed", err);
+      setter("⚠️ Failed to load AI response");
+    } finally {
+      setAiLoading(false);
+    }
   }
-}
-
-
-
-
 
   async function loadOdds() {
     if (odds) {
-      setOdds(null); // toggle hide if already showing
+      setOdds(null);
       return;
     }
 
@@ -283,6 +289,7 @@ async function fetchAi(endpoint, setter, current) {
               events={timeline}
               teamName={home.name}
               teamId={home.id}
+              status={matchStatus} // ✅ pass renamed
             />
           )}
         </div>
@@ -390,6 +397,7 @@ async function fetchAi(endpoint, setter, current) {
               events={timeline}
               teamName={away.name}
               teamId={away.id}
+              status={matchStatus} // ✅ pass renamed
             />
           )}
         </div>
