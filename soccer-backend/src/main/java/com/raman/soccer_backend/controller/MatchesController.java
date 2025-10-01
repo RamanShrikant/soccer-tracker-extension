@@ -124,7 +124,7 @@ private String normalizeTeam(String name) {
     Map.entry("Man City", "Manchester City"),
     Map.entry("Inter Milan", "Internazionale"),
     Map.entry("Sporting CP", "Sporting Lisbon"),
-    Map.entry("Monaco", "AS Monaco")
+    Map.entry("Monaco", "AS Monaco"),
     Map.entry("Newcastle", "Newcastle United"),
     Map.entry("Union St. Gilloise", "Union Saint-Gilloise")
 
