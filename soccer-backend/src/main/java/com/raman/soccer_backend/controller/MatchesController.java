@@ -75,30 +75,35 @@ public Map<String, Object> getOdds(
             return Map.of("error", "No data from Odds API");
         }
 
-        for (Map<String, Object> game : response) {
-            String homeTeam = (String) game.get("home_team");
-            String awayTeamResp = (String) game.get("away_team");
-                // DEBUG LOG
-                System.out.println("Looking for: " + home + " vs " + away);
-                System.out.println("Odds API has: " + homeTeam + " vs " + awayTeamResp);
+for (Map<String, Object> game : response) {
+    String homeTeam = normalizeTeam((String) game.get("home_team"));
+    String awayTeamResp = normalizeTeam((String) game.get("away_team"));
 
-            if (homeTeam.equalsIgnoreCase(home) && awayTeamResp.equalsIgnoreCase(away)) {
-                Map<String, Object> simplified = new HashMap<>();
-                List<Map<String, Object>> bookmakers = (List<Map<String, Object>>) game.get("bookmakers");
-                if (bookmakers != null && !bookmakers.isEmpty()) {
-                    List<Map<String, Object>> markets = (List<Map<String, Object>>) bookmakers.get(0).get("markets");
-                    if (markets != null && !markets.isEmpty()) {
-                        List<Map<String, Object>> outcomes = (List<Map<String, Object>>) markets.get(0).get("outcomes");
-                        if (outcomes != null) {
-                            for (Map<String, Object> o : outcomes) {
-                                simplified.put((String) o.get("name"), o.get("price"));
-                            }
-                        }
+    String searchHome = normalizeTeam(home);
+    String searchAway = normalizeTeam(away);
+
+    // DEBUG LOG
+    System.out.println("Looking for: " + searchHome + " vs " + searchAway);
+    System.out.println("Odds API has: " + homeTeam + " vs " + awayTeamResp);
+
+    if (homeTeam.equalsIgnoreCase(searchHome) && awayTeamResp.equalsIgnoreCase(searchAway)) {
+        Map<String, Object> simplified = new HashMap<>();
+        List<Map<String, Object>> bookmakers = (List<Map<String, Object>>) game.get("bookmakers");
+        if (bookmakers != null && !bookmakers.isEmpty()) {
+            List<Map<String, Object>> markets = (List<Map<String, Object>>) bookmakers.get(0).get("markets");
+            if (markets != null && !markets.isEmpty()) {
+                List<Map<String, Object>> outcomes = (List<Map<String, Object>>) markets.get(0).get("outcomes");
+                if (outcomes != null) {
+                    for (Map<String, Object> o : outcomes) {
+                        simplified.put((String) o.get("name"), o.get("price"));
                     }
                 }
-                return simplified;
             }
         }
+        return simplified;
+    }
+}
+
 
         return Map.of("error", "Match not found in Odds API");
 
@@ -107,6 +112,24 @@ public Map<String, Object> getOdds(
         return Map.of("error", "Exception while fetching odds: " + e.getMessage());
     }
 }
+//helper 
+private String normalizeTeam(String name) {
+    if (name == null) return "";
+    name = name.trim();
+
+    Map<String, String> aliases = Map.ofEntries(
+        Map.entry("Athletic Club", "Athletic Bilbao"),
+        Map.entry("PSG", "Paris Saint Germain"),
+        Map.entry("Qarabag", "Qarabag FK"),
+        Map.entry("Man City", "Manchester City"),
+        Map.entry("Inter Milan", "Internazionale"),
+        Map.entry("Sporting", "Sporting Lisbon")
+        // add more as needed
+    );
+
+    return aliases.getOrDefault(name, name);
+}
+
 
 
 }
