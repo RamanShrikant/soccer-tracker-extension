@@ -107,6 +107,7 @@ public List<Map<String, Object>> getOdds(String league) {
 
     try {
         RestClient oddsClient = RestClient.create();
+        System.out.println("🧠 Using key prefix: " + apiKey.substring(0, 8));
         JsonNode root = oddsClient.get()
                 .uri(url)
                 .retrieve()
