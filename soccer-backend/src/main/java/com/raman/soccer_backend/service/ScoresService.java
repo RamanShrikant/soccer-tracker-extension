@@ -33,6 +33,7 @@ public List<Map<String, Object>> getTodayMatches() {
                 .uri("/fixtures?date=" + today + "&timezone=UTC")
                 .retrieve()
                 .body(JsonNode.class);
+        System.out.println("📥 Raw API response:\n" + root.toPrettyString());
 
         List<Map<String, Object>> matches = new ArrayList<>();
         for (JsonNode m : root.path("response")) {

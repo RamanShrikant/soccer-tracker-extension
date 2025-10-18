@@ -1,4 +1,4 @@
-package com.raman.soccer_backend;
+package com.raman.soccer_backend.controller;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
