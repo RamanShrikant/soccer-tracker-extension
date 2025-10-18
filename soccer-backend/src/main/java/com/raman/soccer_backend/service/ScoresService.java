@@ -16,6 +16,7 @@ public class ScoresService {
 
     public ScoresService(@Value("${apifootball.key:}") String apiKey) {
         System.out.println("🔑 Loaded API key (length): " + (apiKey == null ? "null" : apiKey.length()));
+        System.out.println(apiKey);
         this.client = RestClient.builder()
                 .baseUrl("https://v3.football.api-sports.io")
                 .defaultHeader("x-apisports-key", apiKey)
